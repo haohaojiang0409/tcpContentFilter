@@ -1,0 +1,14 @@
+Podfile.lock
+build/
+DerivedData/
+Package/
+#xcode path
+xcuserdata/
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddat
+!*/xcuserdata/admin.xcuserdatad/xcdebugger/Breakpoints_v2.xcbkptlista/
+!*.xcworkspace/contents.xcworkspacedata
+
+Pods/
+.DS_Store
