@@ -7,6 +7,9 @@
 
 #import <Foundation/Foundation.h>
 #import <NetworkExtension/NetworkExtension.h>
+
+
+
 // FirewallEnums.h
 typedef NS_ENUM(NSUInteger, FlowDirection) {
     FlowDirectionOutbound,
@@ -136,6 +139,8 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
                                              direction:(FlowDirection)direction;
 
 - (BOOL)hostName:(NSString *_Nonnull)host matchesPattern:(NSString *_Nonnull)pattern;
+
+
 @end
 
 

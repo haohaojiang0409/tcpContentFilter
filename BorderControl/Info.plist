@@ -4,5 +4,16 @@
 <dict>
 	<key>com.apple.developer.endpoint-security.client</key>
 	<true/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPINetwork</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>Network filtering for security and parental control</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

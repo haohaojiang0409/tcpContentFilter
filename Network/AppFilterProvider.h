@@ -8,7 +8,10 @@
 #import <Foundation/Foundation.h>
 #import <NetworkExtension/NetworkExtension.h>
 #import "Rule.h"
+static NSMutableDictionary<NSString *, NSString *> *gIPToHostnameMap;
+static dispatch_once_t onceToken;
 
 @interface AppFilterProvider : NEFilterDataProvider
 
++ (void)initialize;
 @end

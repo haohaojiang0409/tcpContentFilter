@@ -87,24 +87,22 @@
     // 1. 解析 direction
     NSString *dirStr = dict[@"direction"];
     if (![dirStr isEqualToString:@"out"] && ![dirStr isEqualToString:@"in"]) {
-        NSLog(@"Invalid direction: %@", dirStr);
+        NSLog(@"[RULE PARSE] ❌ Invalid direction: %@", dirStr ?: @"(null)");
         return @[];
     }
     FlowDirection direction = [dirStr isEqualToString:@"out"] ? FlowDirectionOutbound : FlowDirectionInbound;
+    NSString *dirLog = (direction == FlowDirectionOutbound) ? @"OUT" : @"IN";
 
     // 2. 解析 action
     NSString *action = dict[@"action"];
     BOOL allow = [action isEqualToString:@"pass"]; // "block" → NO
+    NSString *actionLog = allow ? @"PASS" : @"BLOCK";
 
     // 3. 解析元数据
-    NSString *policyName = dict[@"policy_name"];
-    NSString *policyId = dict[@"policy_id"];
-    NSNumber *levelNum = dict[@"level"];
-    BOOL shouldReport = [[dict objectForKey:@"report"] boolValue];
-    NSString *title = dict[@"chinese"][@"title"];
-    NSString *suggestion = dict[@"chinese"][@"suggestion"];
+    NSString *policyName = dict[@"policy_name"] ?: @"(unnamed)";
+    NSString *policyId = dict[@"policy_id"] ?: @"(no-id)";
 
-    // 4. ✅ 一次性解析所有协议
+    // 4. 解析协议
     NSMutableArray<NSNumber *> *protocolTypes = [NSMutableArray array];
     NSString *protoStr = dict[@"proto"];
     if ([protoStr isKindOfClass:[NSString class]]) {
@@ -117,20 +115,29 @@
             } else if ([p isEqualToString:@"icmp"]) {
                 [protocolTypes addObject:@(TransportProtocolICMP)];
             }
-            // 忽略未知协议
         }
     }
     if (protocolTypes.count == 0) {
-        NSLog(@"No valid protocols in rule");
+        NSLog(@"[RULE PARSE] ❌ No valid protocols in rule (proto: %@)", protoStr ?: @"(null)");
         return @[];
     }
 
-    // 5. ✅ 一次性解析所有五元组
+    // 协议转字符串用于日志
+    NSMutableArray<NSString *> *protoLogs = [NSMutableArray array];
+    for (NSNumber *protoNum in protocolTypes) {
+        TransportProtocol p = [protoNum integerValue];
+        if (p == TransportProtocolTCP) [protoLogs addObject:@"TCP"];
+        else if (p == TransportProtocolUDP) [protoLogs addObject:@"UDP"];
+        else if (p == TransportProtocolICMP) [protoLogs addObject:@"ICMP"];
+    }
+    NSString *protoSummary = [protoLogs componentsJoinedByString:@", "];
+
+    // 5. 解析五元组
     NSMutableArray<fiveINetTuple *> *tuples = [NSMutableArray array];
     NSArray *rawTuples = dict[@"tuples"];
     if ([rawTuples isKindOfClass:[NSArray class]]) {
         for (NSDictionary *t in rawTuples) {
-            NSString *host = t[@"dst_host"];
+            NSString *host = t[@"dst_host"] ?: @"";
             NSArray *ports = t[@"dst_port"];
             if (![ports isKindOfClass:[NSArray class]]) continue;
 
@@ -153,16 +160,20 @@
                            ipEnd:0
                        portStart:start
                          portEnd:end
-                       hostName:host ?: @""];
+                       hostName:host];
                 [tuples addObject:tuple];
             }
         }
     }
 
-    // 6. ✅ 创建单条规则（支持多协议）
+    if (tuples.count == 0) {
+        NSLog(@"[RULE PARSE] ⚠️ Rule has no valid tuples (policy: %@)", policyName);
+    }
+
+    // 6. 创建规则
     FirewallRule *rule = [[FirewallRule alloc]
         initWithDirection:direction
-                 protocol:protocolTypes   // ← 传入完整协议数组
+                 protocol:protocolTypes
              fiveTuples:tuples
             processName:nil
             processPath:nil
@@ -172,12 +183,40 @@
     // 7. 设置元数据
     rule.policyName = policyName;
     rule.policyId = policyId;
-    rule.level = [levelNum integerValue];
-    rule.shouldReport = shouldReport;
-    rule.localizedTitle = title;
-    rule.localizedSuggestion = suggestion;
+    rule.level = [dict[@"level"] integerValue];
+    rule.shouldReport = [[dict objectForKey:@"report"] boolValue];
+    rule.localizedTitle = dict[@"chinese"][@"title"];
+    rule.localizedSuggestion = dict[@"chinese"][@"suggestion"];
 
-    // 8. 返回单元素数组
+    // 8. 🖨️ 打印完整规则日志
+    NSMutableString *logMsg = [NSMutableString stringWithFormat:
+        @"\n[RULE PARSE] ✅ Loaded rule:\n"
+        "  Policy: %@ (%@)\n"
+        "  Action: %@\n"
+        "  Direction: %@\n"
+        "  Protocols: %@\n"
+        "  Tuples (%lu):\n",
+        policyName, policyId,
+        actionLog,
+        dirLog,
+        protoSummary,
+        (unsigned long)tuples.count
+    ];
+
+    for (fiveINetTuple *tuple in tuples) {
+        if (tuple.portStart == tuple.portEnd) {
+            [logMsg appendFormat:@"    Host: %@ | Port: %u\n",
+                tuple.hostName.length > 0 ? tuple.hostName : @"*",
+                tuple.portStart];
+        } else {
+            [logMsg appendFormat:@"    Host: %@ | Ports: %u-%u\n",
+                tuple.hostName.length > 0 ? tuple.hostName : @"*",
+                tuple.portStart, tuple.portEnd];
+        }
+    }
+
+    NSLog(@"%@", logMsg);
+
     return @[rule];
 }
 
@@ -359,4 +398,5 @@
     // TODO: 可扩展支持更多模式（如 api.*.com 需要正则）
     return NO;
 }
+
 @end

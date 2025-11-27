@@ -61,19 +61,14 @@
       initWithRules:@[filterRule]
       defaultAction:NEFilterActionAllow
     ];
-
     [self applySettings:filterSettings completionHandler:^(NSError * _Nullable error) {
-      completionHandler(error);
+        if (error) {
+            NSLog(@"Failed to start filter: %@", error.localizedDescription);
+        } else {
+            NSLog(@"Network filter started successfully");
+        }
+        completionHandler(error);
     }];
-//    // 5️⃣ 应用设置
-//    [self applySettings:settings completionHandler:^(NSError * _Nullable error) {
-//        if (error) {
-//            NSLog(@"Failed to start filter: %@", error.localizedDescription);
-//        } else {
-//            NSLog(@"Network filter started successfully");
-//        }
-//        completionHandler(error);
-//    }];
 }
 
 - (void)stopFilterWithReason:(NEProviderStopReason)reason completionHandler:(void (^)(void))completionHandler {
@@ -125,20 +120,32 @@
 }
 
 - (NEFilterNewFlowVerdict *)handleNewFlow:(NEFilterFlow *)flow {
+    NSLog(@"handleNewFlow start");
     if (![flow isKindOfClass:[NEFilterSocketFlow class]]) {
         NSLog(@"[FLOW] Non-socket flow, allowing.");
         return [NEFilterNewFlowVerdict allowVerdict];
     }
-
+    NSLog(@"--------start content filter--------");
     NEFilterSocketFlow *socketFlow = (NEFilterSocketFlow *)flow;
     NWHostEndpoint *remoteEP = (NWHostEndpoint *)socketFlow.remoteEndpoint;
     NWHostEndpoint *localEP  = (NWHostEndpoint *)socketFlow.localEndpoint;
 
+    NSString *hostname = nil;
+    if ([remoteEP isKindOfClass:[NWHostEndpoint class]]) {
+        hostname = [(NWHostEndpoint *)remoteEP hostname];
+        // 过滤掉隐私占位符
+        if (hostname && ![hostname isEqualToString:@"<private>"]) {
+            // 有效 hostname
+        } else {
+            hostname = nil;
+        }
+    }
     NSString *remoteHostname = remoteEP.hostname ?: @"(null)";
     NSInteger remotePort = [remoteEP.port integerValue];
     NSInteger localPort  = [localEP.port integerValue];
     NETrafficDirection direction = socketFlow.direction;
-
+    
+    NSLog(@"[handleNewFlow] %@ ...." ,remoteHostname);
     NSString *directionStr = (direction == NETrafficDirectionOutbound) ? @"OUT" : @"IN";
     NSString *protoStr = @"";
     TransportProtocol proto;
@@ -152,17 +159,6 @@
         protoStr = @"OTHER";
         return [NEFilterNewFlowVerdict allowVerdict];
     }
-    
-    // 🔍 打印完整流信息
-    NSLog(@"\n[NEW FLOW] %@ %@\n"
-          "  Local:  %ld\n"
-          "  Remote: (%@):%ld\n"
-          "  Hostname: %@\n"
-          "  Rule check...",
-          directionStr, protoStr,
-          (long)localPort,
-          remoteHostname, (long)remotePort,
-          remoteHostname);
 
     // 入站放行
     if (direction == NETrafficDirectionInbound) {
@@ -174,18 +170,18 @@
     FirewallRule *matchedRule = [manager firstMatchedRuleForHostname:remoteHostname
                                                            remotePort:remotePort
                                                             localPort:localPort
-                                                             protocol:proto
+                                                             protocol:TransportProtocolTCP
                                                             direction:FlowDirectionOutbound];
-//
-//    if (matchedRule) {
-//        if (!matchedRule.allow) {
-//            NSLog(@"[BLOCK] Blocked by rule: %@", matchedRule.policyName ?: @"N/A");
-//            return [NEFilterNewFlowVerdict dropVerdict];
-//        } else {
-//            NSLog(@"[ALLOW] Allowed by rule: %@", matchedRule.policyName ?: @"N/A");
-//            return [NEFilterNewFlowVerdict allowVerdict];
-//        }
-//    }
+    
+    if (matchedRule) {
+        if (!matchedRule.allow) {
+            NSLog(@"[BLOCK] Blocked by rule: %@", matchedRule.policyName ?: @"NULL");
+            return [NEFilterNewFlowVerdict dropVerdict];
+        } else {
+            NSLog(@"[ALLOW] Allowed by rule: %@", matchedRule.policyName ?: @"NULL");
+            return [NEFilterNewFlowVerdict allowVerdict];
+        }
+    }
 
     NSLog(@"[ALLOW] No matching rule, default allow.");
     return [NEFilterNewFlowVerdict allowVerdict];
@@ -202,4 +198,11 @@
     return [NEFilterDataVerdict allowVerdict];
 }
 
++ (void)initialize{
+    dispatch_once(&onceToken, ^{
+        gIPToHostnameMap = [[NSMutableDictionary alloc] init];
+    });
+}
 @end
+
+
