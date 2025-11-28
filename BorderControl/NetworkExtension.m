@@ -11,8 +11,6 @@
 //过滤数据包的网络插件
 NSString *const networkExtensionBundleId = @"com.eagleyun.BorderControl.Network";
 
-//DNS过滤的网络插件
-//NSString *const DNSProxyBundleId = @"com.eagleyun.BorderControl.FilterDNSProxy";
 @implementation NetworkExtension
 
 static NetworkExtension *sharedInstance = nil;
@@ -55,12 +53,14 @@ static NetworkExtension *sharedInstance = nil;
   [NEFilterManager.sharedManager loadFromPreferencesWithCompletionHandler:^(NSError * _Nullable error) {
     NEFilterProviderConfiguration* configuration = [[NEFilterProviderConfiguration alloc] init];
     configuration.filterPackets = false;
-    configuration.filterDataProviderBundleIdentifier = networkExtensionBundleId;
+    configuration.filterPacketProviderBundleIdentifier = nil;
+
     configuration.filterSockets = true;
-    configuration.filterPacketProviderBundleIdentifier = networkExtensionBundleId;
+    configuration.filterDataProviderBundleIdentifier = networkExtensionBundleId;
     
     NEFilterManager.sharedManager.localizedDescription = networkExtensionBundleId;
     NEFilterManager.sharedManager.enabled = true;
+      
     NEFilterManager.sharedManager.providerConfiguration = configuration;
 
     [NEFilterManager.sharedManager saveToPreferencesWithCompletionHandler:^(NSError * _Nullable error) {

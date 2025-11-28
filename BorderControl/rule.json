@@ -275,7 +275,7 @@
                 "level": 7,
                 "direction": "out",
                 "proto": "tcp|udp",
-                "action": "pass",
+                "action": "block",
                 "policy_name": "wnagyongceshifenzu",
                 "policy_id": "edr_fw_c7898113-3c80-498e-a695-448c531acbc3",
                 "processes": [
@@ -286,10 +286,9 @@
                 "tuples": [
                     {
                         "dst_port": [
-                            "22",
-                            "0"
+                            "1-65535"
                         ],
-                        "dst_host": "www.baid.com"
+                        "dst_host": "www.baidu.com"
                     }
                 ]
             }

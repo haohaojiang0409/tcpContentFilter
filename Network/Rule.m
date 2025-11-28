@@ -337,18 +337,21 @@
             for (fiveINetTuple *tuple in rule.fiveTuples) {
                 // 端口匹配：remotePort ∈ [portStart, portEnd]
                 if (remotePort < tuple.portStart || remotePort > tuple.portEnd) {
+                    NSLog(@"port is not in range");
                     continue;
                 }
 
                 // 主机名匹配（支持 nil 表示任意）
                 if (tuple.hostName == nil) {
                     matched = YES;
+                    NSLog(@"hostname is matched");
                     break;
                 }
 
                 // 支持通配符 *.example.com
                 if ([self hostName:hostname matchesPattern:tuple.hostName]) {
                     matched = YES;
+                    NSLog(@"hostname.* is matched");
                     break;
                 }
             }
@@ -370,7 +373,7 @@
             }
         }
     }
-
+    
     return bestMatch;
 }
 
@@ -398,5 +401,6 @@
     // TODO: 可扩展支持更多模式（如 api.*.com 需要正则）
     return NO;
 }
+
 
 @end

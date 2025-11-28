@@ -8,8 +8,6 @@
 #import <Foundation/Foundation.h>
 #import <NetworkExtension/NetworkExtension.h>
 
-
-
 // FirewallEnums.h
 typedef NS_ENUM(NSUInteger, FlowDirection) {
     FlowDirectionOutbound,
@@ -19,7 +17,8 @@ typedef NS_ENUM(NSUInteger, FlowDirection) {
 typedef NS_ENUM(NSUInteger, TransportProtocol) {
     TransportProtocolTCP,
     TransportProtocolUDP,
-    TransportProtocolICMP
+    TransportProtocolICMP,
+    TransportProtocolUnknown
 };
 
 // 复合键生成器：将「方向+协议」转为唯一字符串Key
@@ -45,6 +44,7 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
 @property (nonatomic, assign) uint16_t portEnd;
 //主机名
 @property (nonatomic , copy , nullable) NSString* hostName;
+//解析后的 IP 列表
 - (instancetype _Nonnull )initWithIpStart:(uint32_t)ipStart
                          ipEnd:(uint32_t)ipEnd
                      portStart:(uint16_t)portStart
