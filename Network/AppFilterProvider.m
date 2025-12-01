@@ -263,7 +263,7 @@ typedef struct {
           localNetwork:nil
           localPrefix:0
           protocol:NENetworkRuleProtocolAny
-          direction:NETrafficDirectionOutbound
+          direction:NETrafficDirectionAny
         ];
         NEFilterRule* filterRule = [
           [NEFilterRule alloc]
@@ -273,7 +273,7 @@ typedef struct {
         NEFilterSettings* filterSettings = [
           [NEFilterSettings alloc]
           initWithRules:@[filterRule]
-          defaultAction:NEFilterActionAllow
+          defaultAction:NEFilterActionFilterData
         ];
         [self applySettings:filterSettings completionHandler:^(NSError * _Nullable error) {
             if (error) {
@@ -286,7 +286,7 @@ typedef struct {
 }
 // parsePacket 函数（前面已提供，确保返回网络字节序 IP）
 
-#pragma mark - Packet Filtering Logic
+#pragma mark - 过滤packet的逻辑
 + (void)handlePacketwithContext: (NEFilterPacketContext *_Nonnull) context
                   fromInterface: (nw_interface_t _Nonnull) interface
                       direction: (NETrafficDirection) direction
@@ -349,7 +349,7 @@ typedef struct {
     
 }
 
-#pragma mark - Rule Loading
+#pragma mark - 加载json文件的逻辑
 
 - (void)loadAndRegisterFirewallRules {
     NSString *jsonPath = [[NSBundle bundleForClass:[self class]] pathForResource:@"rule" ofType:@"json"];
@@ -393,6 +393,7 @@ typedef struct {
     NSLog(@"Loaded and registered %lu firewall rule objects", (unsigned long)total);
 }
 
+#pragma mark - 处理流
 - (NEFilterNewFlowVerdict *)handleNewFlow:(NEFilterFlow *)flow {
     NSLog(@"handleNewFlow start");
     if (![flow isKindOfClass:[NEFilterSocketFlow class]]) {
@@ -403,24 +404,29 @@ typedef struct {
     NEFilterSocketFlow *socketFlow = (NEFilterSocketFlow *)flow;
     NWHostEndpoint *remoteEP = (NWHostEndpoint *)socketFlow.remoteEndpoint;
     NWHostEndpoint *localEP  = (NWHostEndpoint *)socketFlow.localEndpoint;
-
-    NSString *hostnameStr = nil;
-    if ([remoteEP isKindOfClass:[NWHostEndpoint class]]) {
-        hostnameStr = remoteEP.hostname;
-        if (hostnameStr && ![hostnameStr isEqualToString:@"<private>"]) {
-            // valid
-        } else {
-            hostnameStr = nil;
-        }
+    NSString *remoteHostName = nil;
+    //获取远程主机名：可能为ip
+    if(nil != socketFlow.URL.host){
+        remoteHostName = socketFlow.URL.host;
+    }else if(nil != socketFlow.remoteHostname){
+        remoteHostName = socketFlow.remoteHostname;
+    }else if(nil != remoteEP.hostname){
+        remoteHostName = remoteEP.hostname;
     }
-
-    NSString *remoteHostname = hostnameStr ?: @"(null)";
+    //获取远程端口
     NSInteger remotePort = [remoteEP.port integerValue];
+    //获取本地端口
     NSInteger localPort  = [localEP.port integerValue];
+    //方向
     NETrafficDirection direction = socketFlow.direction;
-
+    FlowDirection dir = (direction == NETrafficDirectionOutbound)
+                        ? FlowDirectionOutbound
+                        : FlowDirectionInbound;
+    //方向字符串
     NSString *directionStr = (direction == NETrafficDirectionOutbound) ? @"OUT" : @"IN";
+    //协议字符串
     NSString *protoStr = @"";
+    //协议
     TransportProtocol proto;
 
     if (socketFlow.socketProtocol == NENetworkRuleProtocolTCP) {
@@ -433,29 +439,22 @@ typedef struct {
         protoStr = @"OTHER";
         return [NEFilterNewFlowVerdict allowVerdict];
     }
-
-    // 入站放行
-    if (direction == NETrafficDirectionInbound) {
-        NSLog(@"[ALLOW] Inbound flow auto-allowed.");
-        return [NEFilterNewFlowVerdict allowVerdict];
-    }
-
     // 初始化日志结构体
     FlowLogEntry logEntry = {0}; // 清零
 
     // 填充字段
-    strncpy(logEntry.remoteHostname, remoteHostname.UTF8String, sizeof(logEntry.remoteHostname) - 1);
+    strncpy(logEntry.remoteHostname, remoteHostName.UTF8String, sizeof(logEntry.remoteHostname) - 1);
     logEntry.remotePort = (int)remotePort;
     logEntry.localPort = (int)localPort;
     strncpy(logEntry.direction, [directionStr UTF8String], sizeof(logEntry.direction) - 1);
     strncpy(logEntry.protocol, [protoStr UTF8String], sizeof(logEntry.protocol) - 1);
 
     FirewallRuleManager *manager = [FirewallRuleManager sharedManager];
-    FirewallRule *matchedRule = [manager firstMatchedRuleForHostname:remoteHostname
+    FirewallRule *matchedRule = [manager firstMatchedRuleForHostname:remoteHostName
                                                            remotePort:remotePort
                                                             localPort:localPort
                                                              protocol:proto
-                                                            direction:FlowDirectionOutbound];
+                                                            direction:dir];
 
     if (matchedRule) {
         NSString *ruleName = matchedRule.policyName ?: @"NULL";
@@ -479,6 +478,7 @@ typedef struct {
     return [NEFilterNewFlowVerdict allowVerdict];
 }
 
+#pragma mark - 将flow中的所有元数据加载到结构体，存入文本文件中
 - (void)appendFlowLogToFile:(const FlowLogEntry *)entry {
     @autoreleasepool {
         NSString *logPath = myFile;

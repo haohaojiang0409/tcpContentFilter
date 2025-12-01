@@ -238,6 +238,8 @@
     //初始化内部数据结构
     if (self = [super init]) {
         _ruleGroups = [NSMutableDictionary dictionary];
+        //初始化ip映射域名字典
+        _ipToHostnamesMap = [[NSMutableDictionary alloc] init];
         _syncQueue = dispatch_queue_create("com.bordercontrol.rulemanager.sync", DISPATCH_QUEUE_SERIAL);
     }
     return self;
@@ -342,7 +344,7 @@
                 }
 
                 // 主机名匹配（支持 nil 表示任意）
-                if (tuple.hostName == nil) {
+                if (tuple.hostName == hostname) {
                     matched = YES;
                     NSLog(@"hostname is matched");
                     break;
@@ -356,11 +358,23 @@
                 }
             }
         } else {
+            NSArray<NSString*>* domainNames = resolveAddress(hostname);
+            NSString* firstHostName = domainNames.firstObject;
+            NSLog(@"[%@] is the first element in domainNames" , firstHostName);
+            dispatch_barrier_async(self.syncQueue,^{
+                self.ipToHostnamesMap[hostname] = domainNames;
+            });
             // 入站：只匹配本地端口（localPort），忽略 hostName（因不可靠）
             for (fiveINetTuple *tuple in rule.fiveTuples) {
-                if (localPort >= tuple.portStart && localPort <= tuple.portEnd) {
-                    matched = YES;
-                    break;
+                if (localPort < tuple.portStart || localPort > tuple.portEnd) {
+                    continue;
+                }
+                
+                if(tuple.ipEnd && tuple.ipStart && hostname){
+                    uint32_t ip = strToIpv4Uint16(hostname);
+                    if(ip <= tuple.ipEnd && ip >= tuple.ipStart){
+                        matched = YES;
+                    }
                 }
             }
         }

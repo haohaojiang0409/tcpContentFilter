@@ -7,6 +7,7 @@
 
 #import <Foundation/Foundation.h>
 #import <NetworkExtension/NetworkExtension.h>
+#import "tools.h"
 
 // FirewallEnums.h
 typedef NS_ENUM(NSUInteger, FlowDirection) {
@@ -116,6 +117,9 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSMutableArray<FirewallRule *> *> * _Nonnull ruleGroups;
 
 @property (nonatomic, strong) dispatch_queue_t _Nonnull syncQueue;
+
+//存储ip和域名的映射：一个ip可能对应多个域名
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSArray<NSString *> *> * _Nonnull ipToHostnamesMap;
 
 + (instancetype _Nonnull )sharedManager;
 

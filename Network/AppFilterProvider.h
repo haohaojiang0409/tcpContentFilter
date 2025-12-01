@@ -8,6 +8,8 @@
 #import <Foundation/Foundation.h>
 #import <NetworkExtension/NetworkExtension.h>
 #import "Rule.h"
+#import "tools.h"
+
 //@interface AppFilterProvider : NEFilterDataProvider
 //
 //+ (void)initialize;
