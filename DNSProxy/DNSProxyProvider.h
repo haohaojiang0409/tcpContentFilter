@@ -14,4 +14,13 @@
 
 @interface DNSProxyProvider : NEDNSProxyProvider
 
+-(NSArray<NSString*>*)lookupIPsForDomain:(NSString*)domain;
+
+-(NSDictionary<NSString* , NSArray<NSString*>*>*)copyAllDomainIPsMapping;
+
+-(void)cleanAllMapping;
+
+-(void)recordDomain:(NSString*)domain ips:(NSArray<NSString *> *)ips;
+//初始化方法·
+-(instancetype)init;
 @end
