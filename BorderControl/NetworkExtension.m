@@ -9,7 +9,7 @@
 #import "NetworkExtension.h"
 
 //过滤数据包的网络插件
-NSString *const networkExtensionBundleId = @"com.eagleyun.BorderControl.Network";
+NSString *const networkExtensionBundleId = @"com.eagleyun.BorderControl.DNSProxy";
 
 @implementation NetworkExtension
 
@@ -50,26 +50,67 @@ static NetworkExtension *sharedInstance = nil;
 
 - (void)request:(nonnull OSSystemExtensionRequest *)request didFinishWithResult:(OSSystemExtensionRequestResult)result
 {
-  [NEFilterManager.sharedManager loadFromPreferencesWithCompletionHandler:^(NSError * _Nullable error) {
-    NEFilterProviderConfiguration* configuration = [[NEFilterProviderConfiguration alloc] init];
-    configuration.filterPackets = false;
-    configuration.filterPacketProviderBundleIdentifier = nil;
+//  [NEFilterManager.sharedManager loadFromPreferencesWithCompletionHandler:^(NSError * _Nullable error) {
+//    NEFilterProviderConfiguration* configuration = [[NEFilterProviderConfiguration alloc] init];
+//    configuration.filterPackets = false;
+//    configuration.filterPacketProviderBundleIdentifier = nil;
+//
+//    configuration.filterSockets = true;
+//    configuration.filterDataProviderBundleIdentifier = networkExtensionBundleId;
+//    
+//    NEFilterManager.sharedManager.localizedDescription = networkExtensionBundleId;
+//    NEFilterManager.sharedManager.enabled = true;
+//      
+//    NEFilterManager.sharedManager.providerConfiguration = configuration;
+//
+//    [NEFilterManager.sharedManager saveToPreferencesWithCompletionHandler:^(NSError * _Nullable error) {
+//    }];
+//  }];
+    //provider protocol
+    __block NEDNSProxyProviderProtocol* protocol =  nil;
 
-    configuration.filterSockets = true;
-    configuration.filterDataProviderBundleIdentifier = networkExtensionBundleId;
-    
-    NEFilterManager.sharedManager.localizedDescription = networkExtensionBundleId;
-    NEFilterManager.sharedManager.enabled = true;
-      
-    NEFilterManager.sharedManager.providerConfiguration = configuration;
-
-    [NEFilterManager.sharedManager saveToPreferencesWithCompletionHandler:^(NSError * _Nullable error) {
+    //load prefs
+    [NEDNSProxyManager.sharedManager loadFromPreferencesWithCompletionHandler:^(NSError * _Nullable error) {
+        
+        //err?
+        if(nil != error)
+        {
+            return;
+        }
+        //set description
+        NEDNSProxyManager.sharedManager.localizedDescription = @"DNS";
+        
+        //init protocol
+        protocol = [[NEDNSProxyProviderProtocol alloc] init];
+        
+        //set provider
+        protocol.providerBundleIdentifier = networkExtensionBundleId;
+        
+        //set protocol
+        NEDNSProxyManager.sharedManager.providerProtocol = protocol;
+        
+        //enable
+        NEDNSProxyManager.sharedManager.enabled = YES;
+            
+        //save preferences
+        [NEDNSProxyManager.sharedManager saveToPreferencesWithCompletionHandler:^(NSError * _Nullable error) {
+            if(nil != error)
+            {
+                NSLog(@"error occur : %@" , error);
+                return;
+            }
+        }];
     }];
-  }];
-    
+     
+    return;
 }
 
 - (void)requestNeedsUserApproval:(nonnull OSSystemExtensionRequest *)request {
+}
+
+- (void)systemExtensionWillBecomeInactive:(OSSystemExtensionManager *)manager
+                         request:(OSSystemExtensionRequest *)request {
+    NSLog(@"扩展即将进入非活跃状态: %@", request.identifier);
 }
 
 @end

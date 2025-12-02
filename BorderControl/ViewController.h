@@ -6,9 +6,12 @@
 //
 
 #import <Cocoa/Cocoa.h>
+#import "../Network/XPCServer.h"
 
-@interface ViewController : NSViewController
+@interface ViewController : NSViewController <AppCommunication>
 
+//文本编辑框
+@property (weak) IBOutlet NSTextField *textField;
 
 @end
 

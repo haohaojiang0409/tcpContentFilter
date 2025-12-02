@@ -12,9 +12,10 @@
 #import <SystemExtensions/SystemExtensions.h>
 
 @interface NetworkExtension : NSObject<OSSystemExtensionRequestDelegate, NSXPCListenerDelegate>
-  @property (class, nonatomic, readonly) NetworkExtension *shared;
+//单例对象
+@property (class, nonatomic, readonly) NetworkExtension *shared;
 
-  - (void)install;
+- (void)install;
 @end
 
 #endif /* NetworkExtension_h */

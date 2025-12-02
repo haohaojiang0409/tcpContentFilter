@@ -5,11 +5,7 @@
 	<key>com.apple.developer.networking.networkextension</key>
 	<array>
 		<string>dns-proxy</string>
-		<string>content-filter-provider</string>
-		<string>dns-settings</string>
 	</array>
-	<key>com.apple.developer.system-extension.install</key>
-	<true/>
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>$(TeamIdentifierPrefix)com.eagleyun.BorderControl</string>

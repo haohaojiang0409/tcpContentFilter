@@ -9,11 +9,14 @@
 #import <NetworkExtension/NetworkExtension.h>
 #import "Rule.h"
 #import "tools.h"
-
+#import "XPCServer.h"
+#import <os/log.h>
 //@interface AppFilterProvider : NEFilterDataProvider
 //
 //+ (void)initialize;
 //@end
+
+static os_log_t _Nullable firewallLog;
 
 @interface AppFilterProvider : NEFilterDataProvider
 + (void)handlePacketwithContext: (NEFilterPacketContext *_Nonnull) context

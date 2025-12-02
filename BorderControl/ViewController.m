@@ -25,5 +25,10 @@
     [[NetworkExtension shared] install];
 }
 
-
+//显示在控件上
+- (void)showTextMessageWithMessage:(NSString *)message
+               completionHandler:(void (^)(BOOL success))completionHandler {
+    self.textField.stringValue = message;
+    completionHandler(YES);
+}
 @end

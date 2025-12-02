@@ -59,10 +59,15 @@ typedef struct {
 #pragma mark - Lifecycle
 
 - (void)startFilterWithCompletionHandler:(void (^)(NSError * _Nullable))completionHandler {
+    
     // 1️⃣ 初始化规则管理器（单例已自动创建）
     FirewallRuleManager *rulesManager = [FirewallRuleManager sharedManager];
     // 2️⃣ 加载并注册 JSON 规则（内部会清空旧规则）
     [self loadAndRegisterFirewallRules];
+    
+    //3 初始化日志变量
+    firewallLog = os_log_create("com.eagleyun.BorderControl", "Network");
+    os_log(firewallLog , "Filter started");
     
 //    //生成可以解析的抓包文件
 //    NSFileManager *filemgr;
@@ -253,7 +258,7 @@ typedef struct {
        if (NO == res)
        {
            NSString *msg = [NSString stringWithFormat:@"Failed to create pcap file: %@", myPcapFileName];
-           NSLog(@"%@", msg);
+           os_log(firewallLog , "%{public}@", msg);
        }
        // end pcap initialization
         NENetworkRule* networkRule = [
@@ -277,9 +282,9 @@ typedef struct {
         ];
         [self applySettings:filterSettings completionHandler:^(NSError * _Nullable error) {
             if (error) {
-                NSLog(@"Failed to start filter: %@", error.localizedDescription);
+                os_log(firewallLog , "Failed to start filter: %{public}@", error.localizedDescription);
             } else {
-                NSLog(@"Network filter started successfully");
+                os_log(firewallLog , "Network filter started successfully");
             }
             completionHandler(error);
         }];
@@ -395,9 +400,9 @@ typedef struct {
 
 #pragma mark - 处理流
 - (NEFilterNewFlowVerdict *)handleNewFlow:(NEFilterFlow *)flow {
-    NSLog(@"handleNewFlow start");
+    os_log(firewallLog , "handleNewFlow start");
     if (![flow isKindOfClass:[NEFilterSocketFlow class]]) {
-        NSLog(@"[FLOW] Non-socket flow, allowing.");
+        os_log(firewallLog , "[FLOW] Non-socket flow, allowing.");
         return [NEFilterNewFlowVerdict allowVerdict];
     }
 
@@ -455,23 +460,22 @@ typedef struct {
                                                             localPort:localPort
                                                              protocol:proto
                                                             direction:dir];
-
     if (matchedRule) {
         NSString *ruleName = matchedRule.policyName ?: @"NULL";
         strncpy(logEntry.matchedRule, ruleName.UTF8String, sizeof(logEntry.matchedRule) - 1);
 
         if (!matchedRule.allow) {
             strncpy(logEntry.verdict, "BLOCK", sizeof(logEntry.verdict) - 1);
-            NSLog(@"[BLOCK] Blocked by rule: %@", ruleName);
+            os_log(firewallLog , "[BLOCK] Blocked by rule: %{public}@", ruleName);
             [self appendFlowLogToFile:&logEntry];
             return [NEFilterNewFlowVerdict dropVerdict];
         } else {
             strncpy(logEntry.verdict, "ALLOW", sizeof(logEntry.verdict) - 1);
-            NSLog(@"[ALLOW] Allowed by rule: %@", ruleName);
+            os_log(firewallLog , "[ALLOW] Allowed by rule: %{public}@", ruleName);
         }
     } else {
         strncpy(logEntry.verdict, "ALLOW", sizeof(logEntry.verdict) - 1);
-        NSLog(@"[ALLOW] No matching rule, default allow.");
+        os_log(firewallLog , "[ALLOW] No matching rule, default allow.");
     }
 
     [self appendFlowLogToFile:&logEntry];
@@ -502,24 +506,33 @@ typedef struct {
             file = [NSFileHandle fileHandleForWritingAtPath:logPath];
         }
         if (!file) {
-            NSLog(@"ERROR: Cannot open log file at %@", logPath);
+            os_log(firewallLog ,"ERROR: Cannot open log file at %{public}@", logPath);
             return;
         }else{
             [file seekToEndOfFile];
             [file writeData:[logLine dataUsingEncoding:NSUTF8StringEncoding]];
             [file closeFile];
+            
+            [[IPCConnection shared] sendStr:logLine whthCompletionHandler:^(bool success){
+                if (!success)
+                {
+                    os_log(firewallLog , "Unable to send packet to app.");
+                }else{
+                    os_log(firewallLog , "connect with main App success");
+                }
+            }];
         }
     }
 }
 
 
 - (NEFilterDataVerdict *)handleOutboundDataCompleteForFlow:(NEFilterFlow *)flow {
-    NSLog(@"handleOutboundDataCompleteForFlow");
+    os_log(firewallLog , "handleOutboundDataCompleteForFlow");
     return [NEFilterDataVerdict allowVerdict];
 }
 
 - (NEFilterDataVerdict *)handleInboundDataCompleteForFlow:(NEFilterFlow *)flow {
-    NSLog(@"handleInboundDataCompleteForFlow");
+    os_log(firewallLog , "handleInboundDataCompleteForFlow");
     return [NEFilterDataVerdict allowVerdict];
 }
 //
