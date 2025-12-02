@@ -7,7 +7,9 @@
     NSMutableDictionary<NSString *, NSArray<NSString *>* >*domainToIPs;
     dispatch_queue_t _dnsQueue; // 线程安全队列
 }
-
+///初始化函数
+/// 初始化ip和域名的对应字典
+/// 初始化队列，用于线程安全操作
 - (instancetype)init {
     self = [super init];
     if (self) {
@@ -50,10 +52,12 @@
     NSLog(@"DNS proxy wake");
 }
 
+///处理一个新接受的数据流
 - (BOOL)handleNewFlow:(NEAppProxyFlow *)flow {
     // UDP流量处理
     if ([flow isKindOfClass:[NEAppProxyUDPFlow class]]) {
         NEAppProxyUDPFlow *udpFlow = (NEAppProxyUDPFlow *)flow;
+        //打开一个连接
         [udpFlow openWithLocalFlowEndpoint:udpFlow.localFlowEndpoint completionHandler:^(NSError *error) {
             if (error) {
                 NSLog(@"UDP flow open failed: %@", error);
@@ -89,6 +93,7 @@
 
 #pragma mark - UDP处理
 - (void)flowOutUDP:(NEAppProxyUDPFlow *)flow {
+    //读取数据报
     [flow readDatagramsAndFlowEndpointsWithCompletionHandler:^(NSArray<NSData *> *datagrams, NSArray<NWEndpoint *> *endpoints, NSError *error) {
         if (error || datagrams.count == 0) {
             [flow closeReadWithError:error];
@@ -99,7 +104,7 @@
         for (NSUInteger i = 0; i < datagrams.count; i++) {
             NSString *domain = [self parseDNSQueryDomain:datagrams[i]];
             if (domain) {
-                NSLog(@"DNS Query (UDP): %@", domain);
+                NSLog(@"DNS Query (UDP): %@", domain?:nil);
             }
         }
 
@@ -159,7 +164,7 @@
                 NSData *dnsPacket = [data subdataWithRange:NSMakeRange(2, dnsLength)];
                 
                 // 提取域名（用于匹配缓存）
-                NSString *domain = [strongSelf parseDNSQueryDomain:dnsPacket]; 
+                NSString *domain = [strongSelf parseDNSQueryDomain:dnsPacket];
 
                 // 解析响应中的 IP 列表
                 NSArray<NSString *> *ips = [strongSelf parseDNSResponseIPs:dnsPacket];
@@ -302,13 +307,18 @@
         if (type == 1 && dataLen == 4 && index + 4 <= data.length) {
             char ipStr[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &bytes[index], ipStr, INET_ADDRSTRLEN);
+            NSLog(@"[parseDNSResponseIPs] ipstr : %s",ipStr);
             [ips addObject:@(ipStr)];
         }
         // AAAA记录（IPv6）
-        else if (type == 28 && dataLen == 16 && index + 16 <= data.length) {
+        else if (type == 28 && dataLen == 16) { // AAAA record (IPv6)
+            struct in6_addr addr;
+            memcpy(&addr, &bytes[index], sizeof(addr));
             char ipStr[INET6_ADDRSTRLEN];
-            inet_ntop(AF_INET6, &bytes[index], ipStr, INET6_ADDRSTRLEN);
-            [ips addObject:@(ipStr)];
+            if (inet_ntop(AF_INET6, &addr, ipStr, INET6_ADDRSTRLEN)) {
+                // 规范化 IPv6（可选）
+                [ips addObject:[NSString stringWithUTF8String:ipStr]];
+            }
         }
         
         index += dataLen;
