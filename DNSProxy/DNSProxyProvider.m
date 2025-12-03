@@ -104,11 +104,12 @@
         for (NSUInteger i = 0; i < datagrams.count; i++) {
             NSString *domain = [self parseDNSQueryDomain:datagrams[i]];
             if (domain) {
-                NSLog(@"DNS Query (UDP): %@", domain?:nil);
+                NSLog(@"DNS Query (UDP): %@", domain);
+            }else{
+                NSLog(@"DNS Query (UDP) is nil");
             }
         }
-
-        // ✅ 关键：直接将原始数据写回 flow！
+        
         // 系统会自动将其发送到 endpoints[i]（即 App 原本要发的 DNS 服务器）
         [flow writeDatagrams:datagrams sentByFlowEndpoints:endpoints completionHandler:^(NSError *writeError) {
             if (writeError) {
@@ -207,6 +208,7 @@
         // 检查是否为压缩指针 (RFC 1035: 14. 章节)
         if ((len & 0xC0) == 0xC0) {
             if (index + 1 >= data.length) {
+                NSLog(@"------- point is not full ------ ");
                 return nil; // 指针不完整
             }
             // 指针占 2 字节，高 2 位是标志，低 14 位是偏移
@@ -216,17 +218,20 @@
                 jumpCount++;
                 continue;
             } else {
+                NSLog(@"------- point is not full ------ ");
                 return nil; // 无效指针
             }
         }
 
         // 长度为 0 表示域名结束
         if (len == 0) {
+            NSLog(@"------- len == 0 break ------ ");
             break;
         }
 
         // 普通标签
         if (index + 1 + len > data.length) {
+            NSLog(@"------- index is beyond length ------ ");
             return nil; // 标签超出数据范围
         }
 
@@ -248,9 +253,10 @@
 
     // 如果 domain 为空，说明解析失败
     if (domain.length == 0) {
+        NSLog(@"----domain is nil----");
         return nil;
     }
-
+    NSLog(@"---domain is got successfully----");
     return [domain copy];
 }
 
@@ -316,7 +322,6 @@
             memcpy(&addr, &bytes[index], sizeof(addr));
             char ipStr[INET6_ADDRSTRLEN];
             if (inet_ntop(AF_INET6, &addr, ipStr, INET6_ADDRSTRLEN)) {
-                // 规范化 IPv6（可选）
                 [ips addObject:[NSString stringWithUTF8String:ipStr]];
             }
         }

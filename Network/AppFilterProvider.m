@@ -407,15 +407,26 @@ typedef struct {
     }
 
     NEFilterSocketFlow *socketFlow = (NEFilterSocketFlow *)flow;
+    
+    //远程端点
     NWHostEndpoint *remoteEP = (NWHostEndpoint *)socketFlow.remoteEndpoint;
+    
+    //处理DNS请求
+    if([remoteEP.port isEqualToString:@"53"]){
+        return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:NO peekInboundBytes:0 filterOutbound:YES peekOutboundBytes:64];
+    }
+    //本地端点
     NWHostEndpoint *localEP  = (NWHostEndpoint *)socketFlow.localEndpoint;
     NSString *remoteHostName = nil;
     //获取远程主机名：可能为ip
     if(nil != socketFlow.URL.host){
+        NSLog(@"socket URL host is not nil");
         remoteHostName = socketFlow.URL.host;
     }else if(nil != socketFlow.remoteHostname){
+        NSLog(@"socket remoteHost Name is not nil");
         remoteHostName = socketFlow.remoteHostname;
     }else if(nil != remoteEP.hostname){
+        NSLog(@"remoteEP hostname is not nil");
         remoteHostName = remoteEP.hostname;
     }
     //获取远程端口
@@ -442,6 +453,7 @@ typedef struct {
         protoStr = @"UDP";
     } else {
         protoStr = @"OTHER";
+        NSLog(@"----the flow is other protocol，default allowed----");
         return [NEFilterNewFlowVerdict allowVerdict];
     }
     // 初始化日志结构体
@@ -526,8 +538,17 @@ typedef struct {
 }
 
 
-- (NEFilterDataVerdict *)handleOutboundDataCompleteForFlow:(NEFilterFlow *)flow {
+- (NEFilterDataVerdict *) handleOutboundDataFromFlow:(NEFilterFlow *) flow
+                                readBytesStartOffset:(NSUInteger) offset
+                                           readBytes:(NSData *) readBytes {
     os_log(firewallLog , "handleOutboundDataCompleteForFlow");
+    if([self isDNSFlow:flow]){
+        NSString* domain = [self parseDNSQueryDomain:readBytes];
+        NSLog(@"DNS Query: %@", domain);
+        if ([domain hasSuffix:@".example.com"]) {
+            return [NEFilterDataVerdict dropVerdict]; // 拦截
+        }
+    }
     return [NEFilterDataVerdict allowVerdict];
 }
 
@@ -535,6 +556,97 @@ typedef struct {
     os_log(firewallLog , "handleInboundDataCompleteForFlow");
     return [NEFilterDataVerdict allowVerdict];
 }
+
+- (BOOL)isDNSFlow:(NEFilterFlow *)flow {
+    if (![flow isKindOfClass:[NEFilterSocketFlow class]]) {
+        return NO;
+    }
+    
+    NEFilterSocketFlow *socketFlow = (NEFilterSocketFlow *)flow;
+    NWEndpoint *remoteEndpoint = socketFlow.remoteEndpoint;
+    
+    // 检查是否是 host endpoint（排除 UNIX socket 等）
+    if (![remoteEndpoint isKindOfClass:[NWHostEndpoint class]]) {
+        return NO;
+    }
+    
+    NWHostEndpoint *hostEndpoint = (NWHostEndpoint *)remoteEndpoint;
+    NSString *port = hostEndpoint.port;
+    
+    // DNS 标准端口是 53（字符串 "53"）
+    return [port isEqualToString:@"53"];
+}
+
+- (NSString *)parseDNSQueryDomain:(NSData *)data {
+    if (!data || data.length < 12 + 1) {
+        return nil; // 至少要有 header + 1 字节域名
+    }
+
+    const uint8_t *bytes = (const uint8_t *)[data bytes];
+    NSUInteger index = 12; // 跳过 12 字节 DNS header
+    NSUInteger originalIndex = index;
+    NSMutableString *domain = [NSMutableString string];
+    int jumpCount = 0;
+    const int maxJumps = 10; // 防止指针循环
+
+    while (index < data.length && jumpCount < maxJumps) {
+        uint8_t len = bytes[index];
+
+        // 检查是否为压缩指针 (RFC 1035: 14. 章节)
+        if ((len & 0xC0) == 0xC0) {
+            if (index + 1 >= data.length) {
+                NSLog(@"------- point is not full ------ ");
+                return nil; // 指针不完整
+            }
+            // 指针占 2 字节，高 2 位是标志，低 14 位是偏移
+            uint16_t pointer = ((len & 0x3F) << 8) | bytes[index + 1];
+            if (pointer >= 12) { // 偏移必须 >= 12（不能指向 header）
+                index = pointer;
+                jumpCount++;
+                continue;
+            } else {
+                NSLog(@"------- point is not full ------ ");
+                return nil; // 无效指针
+            }
+        }
+
+        // 长度为 0 表示域名结束
+        if (len == 0) {
+            NSLog(@"------- len == 0 break ------ ");
+            break;
+        }
+
+        // 普通标签
+        if (index + 1 + len > data.length) {
+            NSLog(@"------- index is beyond length ------ ");
+            return nil; // 标签超出数据范围
+        }
+
+        // 提取标签内容
+        NSString *label = [[NSString alloc] initWithBytes:&bytes[index + 1]
+                                                  length:len
+                                                encoding:NSUTF8StringEncoding];
+        if (!label) {
+            return nil; // 非 UTF-8 标签（理论上不应发生）
+        }
+
+        if (domain.length > 0) {
+            [domain appendString:@"."];
+        }
+        [domain appendString:label];
+
+        index += 1 + len; // 跳过长度字节 + 标签内容
+    }
+
+    // 如果 domain 为空，说明解析失败
+    if (domain.length == 0) {
+        NSLog(@"----domain is nil----");
+        return nil;
+    }
+    NSLog(@"---domain is got successfully----");
+    return [domain copy];
+}
+
 //
 //+ (void)initialize{
 //    dispatch_once(&onceToken, ^{

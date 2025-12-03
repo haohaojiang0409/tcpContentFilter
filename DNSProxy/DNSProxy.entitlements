@@ -8,7 +8,7 @@
 	</array>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>$(TeamIdentifierPrefix)com.eagleyun.BorderControl</string>
+		<string>group.585Z2747F9.com.eagleyun.BorderControl</string>
 	</array>
 </dict>
 </plist>
