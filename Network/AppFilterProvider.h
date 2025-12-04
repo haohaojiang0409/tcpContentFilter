@@ -10,13 +10,13 @@
 #import "Rule.h"
 #import "tools.h"
 #import "XPCServer.h"
-#import <os/log.h>
+#import "log.h"
 //@interface AppFilterProvider : NEFilterDataProvider
 //
 //+ (void)initialize;
 //@end
 
-static os_log_t _Nullable firewallLog;
+static os_log_t _Nonnull firewallLog;
 
 @interface AppFilterProvider : NEFilterDataProvider
 + (void)handlePacketwithContext: (NEFilterPacketContext *_Nonnull) context
@@ -24,4 +24,5 @@ static os_log_t _Nullable firewallLog;
                         direction: (NETrafficDirection) direction
                      withRawBytes: (const void *_Nonnull) packetBytes
                         length: (const size_t) packetLength;
+- (BOOL)isDNSFlow:(NEFilterFlow * _Nonnull)flow;
 @end

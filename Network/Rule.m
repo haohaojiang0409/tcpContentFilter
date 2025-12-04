@@ -87,7 +87,7 @@
     // 1. 解析 direction
     NSString *dirStr = dict[@"direction"];
     if (![dirStr isEqualToString:@"out"] && ![dirStr isEqualToString:@"in"]) {
-        NSLog(@"[RULE PARSE] ❌ Invalid direction: %@", dirStr ?: @"(null)");
+        NSLog(@"[RULE PARSE] Invalid direction: %@", dirStr ?: @"(null)");
         return @[];
     }
     FlowDirection direction = [dirStr isEqualToString:@"out"] ? FlowDirectionOutbound : FlowDirectionInbound;
@@ -138,6 +138,7 @@
     if ([rawTuples isKindOfClass:[NSArray class]]) {
         for (NSDictionary *t in rawTuples) {
             NSString *host = t[@"dst_host"] ?: @"";
+            NSLog(@"hostName : %@",host);
             NSArray *ports = t[@"dst_port"];
             if (![ports isKindOfClass:[NSArray class]]) continue;
 
@@ -154,10 +155,26 @@
                 } else {
                     start = end = (uint16_t)[portSpec integerValue];
                 }
-
+                
+                // 👇 解析 source_ip（单个 IP 字符串）
+                NSString *ipStr = t[@"dst_ip"]; // 假设 JSON 中是字符串，如 "192.168.1.1"
+                uint32_t ipStart = 0, ipEnd = 0;
+                if ([ipStr isKindOfClass:[NSString class]] && ipStr.length > 0) {
+                    //将ipv4地址转为数字进行比较
+                    uint32_t ip = ipv4StringToUInt32(ipStr);
+                    if (ip != 0 || [ipStr isEqualToString:@"0.0.0.0"]) {
+                        // 特别处理 "0.0.0.0"：ipv4StringToUInt32("0.0.0.0") 返回 0，但它是合法的
+                        ipStart = ipEnd = ip;
+                        NSLog(@"rule --- ip address : %@:%u",ipStr,ip);
+                    } else {
+                        NSLog(@"[RULE PARSE] ⚠️ Invalid source_ip: %@", ipStr);
+                        continue; // 可选：跳过整个 tuple，或当作 0.0.0.0-255.255.255.255？
+                    }
+                }
+                
                 fiveINetTuple *tuple = [[fiveINetTuple alloc]
-                    initWithIpStart:0
-                           ipEnd:0
+                    initWithIpStart:ipStart
+                           ipEnd:ipEnd
                        portStart:start
                          portEnd:end
                        hostName:host];
@@ -187,36 +204,6 @@
     rule.shouldReport = [[dict objectForKey:@"report"] boolValue];
     rule.localizedTitle = dict[@"chinese"][@"title"];
     rule.localizedSuggestion = dict[@"chinese"][@"suggestion"];
-
-    // 8. 🖨️ 打印完整规则日志
-    NSMutableString *logMsg = [NSMutableString stringWithFormat:
-        @"\n[RULE PARSE] ✅ Loaded rule:\n"
-        "  Policy: %@ (%@)\n"
-        "  Action: %@\n"
-        "  Direction: %@\n"
-        "  Protocols: %@\n"
-        "  Tuples (%lu):\n",
-        policyName, policyId,
-        actionLog,
-        dirLog,
-        protoSummary,
-        (unsigned long)tuples.count
-    ];
-
-    for (fiveINetTuple *tuple in tuples) {
-        if (tuple.portStart == tuple.portEnd) {
-            [logMsg appendFormat:@"    Host: %@ | Port: %u\n",
-                tuple.hostName.length > 0 ? tuple.hostName : @"*",
-                tuple.portStart];
-        } else {
-            [logMsg appendFormat:@"    Host: %@ | Ports: %u-%u\n",
-                tuple.hostName.length > 0 ? tuple.hostName : @"*",
-                tuple.portStart, tuple.portEnd];
-        }
-    }
-
-    NSLog(@"%@", logMsg);
-
     return @[rule];
 }
 
@@ -272,10 +259,33 @@
                 group = [NSMutableArray array];
                 self.ruleGroups[key] = group;
             }
-            [group addObject:rule];
+            // 🔽 按 level 降序插入（高优先级在前）
+            NSInteger insertIndex = [self indexOfInsertionForRule:rule inSortedArray:group];
+            NSLog(@"insertIndex : %ld level of rule : %ld" , (long)insertIndex , (long)rule.level);
+            [group insertObject:rule atIndex:insertIndex];
         }
     });
 }
+
+//二分插入
+- (NSInteger)indexOfInsertionForRule:(FirewallRule *)newRule
+                      inSortedArray:(NSArray<FirewallRule *> *)sortedArray {
+    NSInteger low = 0;
+    NSInteger high = sortedArray.count;
+    
+    while (low < high) {
+        NSInteger mid = low + (high - low) / 2;
+        FirewallRule *midRule = sortedArray[mid];
+        
+        if (newRule.level < midRule.level) {
+            high = mid; // 新规则优先级更高（数字更小），应插在前面
+        } else {
+            low = mid + 1;
+        }
+    }
+    return low;
+}
+
 
 - (void)removeAllRules {
     dispatch_sync(self.syncQueue, ^{
@@ -383,21 +393,27 @@
 //    return bestMatch;
 //}
 
-
+///出站判断函数，出站可匹配ip地址，可匹配域名
 -(FirewallRule*)firstMatchedRuleForOutBound:(NSString*)_remoteHostName
                                  remotePort:(NSString*)_remotePort
                                    protocol:(NSString*)_Protocol{
     // 1. 获取该 direction + protocol 下的所有规则
-    NSArray<FirewallRule *> *candidateRules = [self rulesForDirection:NETrafficDirectionOutbound protocol:_Protocol];
+    NSArray<FirewallRule *> *candidateRules = [self rulesForDirection:FlowDirectionOutbound protocol:_Protocol];
     if (candidateRules.count == 0) {
         NSLog(@"firstMatchedRuleForHostname : candidataeRules is nil");
         return nil;
     }else{
         NSLog(@"the number of rules is : %lu",(unsigned long)candidateRules.count);
     }
+    //2.判断是否是IPV4地址,出站只获取远端域名/ip和远端端口即可
+    BOOL isIPv4 = NO;
+    if (_remoteHostName.length > 0) {
+        struct in_addr addr;
+        if (inet_pton(AF_INET, [_remoteHostName UTF8String], &addr) == 1) {
+            isIPv4 = YES;
+        }
+    }
     //2.开始逐个判断
-    FirewallRule *bestMatch = nil;
-    NSInteger highestLevel = NSNotFound;
     for(FirewallRule* rule in candidateRules){
         BOOL isMatched = NO;
         // 3.出站：检查每个 fiveTuple 的 hostName 和 remotePort 是否在范围内
@@ -410,28 +426,99 @@
                 continue;
             }
             // 主机名匹配（支持 nil 表示任意）
-            if (tuple.hostName == _remoteHostName) {
-                isMatched = YES;
-                NSLog(@"hostname is matched");
-                break;
-            }
-            // 支持通配符 *.example.com
-            if ([self hostName:_remoteHostName matchesPattern:tuple.hostName]) {
-                isMatched = YES;
-                NSLog(@"hostname.* is matched");
-                break;
+            if(!isIPv4){
+                if ([tuple.hostName isEqualToString:_remoteHostName]) {
+                    isMatched = YES;
+                    NSLog(@"hostname is matched");
+                    break;
+                }else{
+                    NSLog(@"hostname is not matched and tuple.hostName : %@ != %@", tuple.hostName , _remoteHostName);
+                }
+            }else {
+                // IPv4 匹配
+                uint32_t remoteIp = ipv4StringToUInt32(_remoteHostName);
+                if (tuple.ipStart == 0 && tuple.ipEnd == 0) {
+                    // 规则未指定 IP 范围 → 匹配任意 IP
+                    isMatched = YES;
+                    NSLog(@"IP wildcard (0.0.0.0-0.0.0.0) matched for %@", _remoteHostName);
+                }else if (remoteIp >= tuple.ipStart && remoteIp <= tuple.ipEnd) {
+                    isMatched = YES;
+                    NSLog(@"IP range matched: %@ in [%u, %u]", _remoteHostName, tuple.ipStart, tuple.ipEnd);
+                }else{
+                    NSLog(@"IP %@ NOT in range [%u, %u]", _remoteHostName, tuple.ipStart, tuple.ipEnd);
+                }
+                if(isMatched){
+                    break;
+                }
             }
         }
-        //4.如果匹配到了规则
-        if (isMatched) {
-            // 选择 level 最高的规则（数值越大优先级越高）
-            if (rule.level > highestLevel) {
-                highestLevel = rule.level;
-                bestMatch = rule;
-            }
+        if(isMatched){
+            return rule;
         }
     }
-    return bestMatch;
+    NSLog(@"---don't have any matched rule---");
+    return nil;
+}
+
+//入站匹配函数
+-(FirewallRule*_Nonnull)firstMatchedRuleForInBound:(NSString*_Nonnull)_remoteIP
+                                        localPort:(NSString*_Nonnull)_localPort
+                                          protocol:(NSString*_Nonnull)_Protocol{
+    // 1. 获取该 direction + protocol 下的所有规则
+    NSArray<FirewallRule *> *candidateRules = [self rulesForDirection:FlowDirectionInbound protocol:_Protocol];
+    if (candidateRules.count == 0) {
+        NSLog(@"firstMatchedRuleForHostname : candidataeRules is nil");
+        return nil;
+    }else{
+        NSLog(@"the number of rules is : %lu",(unsigned long)candidateRules.count);
+    }
+    ///判断是否是IPV4地址
+    BOOL isIPv4 = NO;
+    if (_remoteIP.length > 0) {
+        struct in_addr addr;
+        if (inet_pton(AF_INET, [_remoteIP UTF8String], &addr) == 1) {
+            isIPv4 = YES;
+        }
+    }
+    //2.开始逐个判断
+    for(FirewallRule* rule in candidateRules){
+        BOOL isMatched = NO;
+        // 3.入站：检查每个 fiveTuple 的 hostName 和 remotePort 是否在范围内
+        for (fiveINetTuple *tuple in rule.fiveTuples) {
+            // 端口匹配：remotePort ∈ [portStart, portEnd]
+            NSUInteger Port = [_localPort integerValue];
+            NSLog(@"local port :%lu , tuplestart : %hu , tupleend : %hu",(unsigned long)Port , tuple.portStart , tuple.portEnd);
+            if (_localPort < tuple.portStart || _localPort > tuple.portEnd) {
+                NSLog(@"port is not in range");
+                continue;
+            }
+//            // ip匹配（支持 nil 表示任意）
+//            if(!isIPv4){
+//                NSLog(@"----isn't remoteIP----");
+//            }else {
+//                // IPv4 匹配
+//                uint32_t remoteIp = ipv4StringToUInt32(_remoteHostName);
+//                if (tuple.ipStart == 0 && tuple.ipEnd == 0) {
+//                    // 规则未指定 IP 范围 → 匹配任意 IP
+//                    isMatched = YES;
+//                    NSLog(@"IP wildcard (0.0.0.0-0.0.0.0) matched for %@", _remoteHostName);
+//                }else if (remoteIp >= tuple.ipStart && remoteIp <= tuple.ipEnd) {
+//                    isMatched = YES;
+//                    NSLog(@"IP range matched: %@ in [%u, %u]", _remoteHostName, tuple.ipStart, tuple.ipEnd);
+//                }else{
+//                    NSLog(@"IP %@ NOT in range [%u, %u]", _remoteHostName, tuple.ipStart, tuple.ipEnd);
+//                }
+//                if(isMatched){
+//                    break;
+//                }
+//            }
+        }
+        if(isMatched){
+            return rule;
+        }
+    }
+    NSLog(@"---don't have any matched rule---");
+    return nil;
 }
 // 主机名通配符匹配工具方法（支持 *.example.com）
 - (BOOL)hostName:(NSString *)host matchesPattern:(NSString *)pattern {
@@ -457,6 +544,5 @@
     // TODO: 可扩展支持更多模式（如 api.*.com 需要正则）
     return NO;
 }
-
 
 @end

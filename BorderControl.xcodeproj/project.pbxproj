@@ -14,6 +14,7 @@
 		44766DE02ED0099A00814D30 /* Rule.m in Sources */ = {isa = PBXBuildFile; fileRef = 44766DDF2ED0099800814D30 /* Rule.m */; };
 		44B09B362ED5D0F700CF0082 /* rule.json in Resources */ = {isa = PBXBuildFile; fileRef = 44B09B352ED5D0F700CF0082 /* rule.json */; };
 		44B09B372ED5D0F700CF0082 /* rule.json in Resources */ = {isa = PBXBuildFile; fileRef = 44B09B352ED5D0F700CF0082 /* rule.json */; };
+		44F6A8142EE192BC0073BD27 /* log.m in Sources */ = {isa = PBXBuildFile; fileRef = 44F6A8132EE192BB0073BD27 /* log.m */; };
 		63938C572A38BCD600734619 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 63938C562A38BCD600734619 /* AppDelegate.m */; };
 		63938C5A2A38BCD600734619 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 63938C592A38BCD600734619 /* ViewController.m */; };
 		63938C5C2A38BCD800734619 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 63938C5B2A38BCD800734619 /* Assets.xcassets */; };
@@ -98,6 +99,8 @@
 		44766DDE2ED0099200814D30 /* Rule.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Rule.h; sourceTree = "<group>"; };
 		44766DDF2ED0099800814D30 /* Rule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Rule.m; sourceTree = "<group>"; };
 		44B09B352ED5D0F700CF0082 /* rule.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = rule.json; sourceTree = "<group>"; };
+		44F6A8122EE192A90073BD27 /* log.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = log.h; sourceTree = "<group>"; };
+		44F6A8132EE192BB0073BD27 /* log.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = log.m; sourceTree = "<group>"; };
 		6378C61A2A47B85100E1D2C4 /* libEndpointSecurity.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libEndpointSecurity.tbd; path = usr/lib/libEndpointSecurity.tbd; sourceTree = SDKROOT; };
 		6378C62F2A47F1A400E1D2C4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		63938C522A38BCD600734619 /* BorderControl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BorderControl.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -214,6 +217,8 @@
 		63938C712A38BD2C00734619 /* Network */ = {
 			isa = PBXGroup;
 			children = (
+				44F6A8122EE192A90073BD27 /* log.h */,
+				44F6A8132EE192BB0073BD27 /* log.m */,
 				446A00C72EDD77D500844427 /* XPCServer.h */,
 				446A00C82EDD77E400844427 /* XPCServer.m */,
 				44405ACD2ED97E7F00FD2DD1 /* tools.h */,
@@ -385,6 +390,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				44F6A8142EE192BC0073BD27 /* log.m in Sources */,
 				446A00C92EDD77EA00844427 /* XPCServer.m in Sources */,
 				44766DE02ED0099A00814D30 /* Rule.m in Sources */,
 				63938C762A38BD2C00734619 /* main.m in Sources */,

@@ -8,6 +8,8 @@
 #import <Foundation/Foundation.h>
 #import <NetworkExtension/NetworkExtension.h>
 #import "tools.h"
+#import "log.h"
+#import "AppFilterProvider.h"
 
 // FirewallEnums.h
 typedef NS_ENUM(NSUInteger, FlowDirection) {
@@ -136,11 +138,11 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
 /// 获取所有规则（用于 UI 展示、导出等）
 - (NSArray<FirewallRule *> *_Nonnull)allRules;
 
-- (FirewallRule *_Nullable)firstMatchedRuleForHostname:(NSString *_Nonnull)hostname
-                                              remotePort:(NSInteger)remotePort
-                                               localPort:(NSInteger)localPort
-                                                protocol:(TransportProtocol)protocol
-                                             direction:(FlowDirection)direction;
+//- (FirewallRule *_Nullable)firstMatchedRuleForHostname:(NSString *_Nonnull)hostname
+//                                              remotePort:(NSInteger)remotePort
+//                                               localPort:(NSInteger)localPort
+//                                                protocol:(TransportProtocol)protocol
+//                                             direction:(FlowDirection)direction;
 
 - (BOOL)hostName:(NSString *_Nonnull)host matchesPattern:(NSString *_Nonnull)pattern;
 
@@ -149,6 +151,10 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
                                          remotePort:(NSString*_Nonnull)_remotePort
                                            protocol:(NSString*_Nonnull)_Protocol;
 
+//匹配入站的规则
+-(FirewallRule*_Nonnull)firstMatchedRuleForInBound:(NSString*_Nonnull)_remoteIP
+                                        localPort:(NSString*_Nonnull)_localPort
+                                          protocol:(NSString*_Nonnull)_Protocol;
 @end
 
 

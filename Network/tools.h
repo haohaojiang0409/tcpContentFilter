@@ -14,4 +14,6 @@
 NSArray* resolveAddress(NSString* ipAddr);
 
 uint32_t strToIpv4Uint16(NSString* strHostName);
+
+uint32_t ipv4StringToUInt32(NSString *ipStr);
 #endif
