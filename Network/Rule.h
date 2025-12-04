@@ -130,8 +130,8 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
 - (void)removeAllRules;
 
 /// 获取指定方向和协议的所有规则（用于匹配引擎）
-- (NSArray<FirewallRule *> *_Nonnull)rulesForDirection:(FlowDirection)direction
-                                      protocol:(TransportProtocol)protocol;
+- (NSArray<FirewallRule *> *_Nonnull)rulesForDirection:(FlowDirection)_direction
+                                              protocol:(NSString*_Nonnull)_protocol;
 
 /// 获取所有规则（用于 UI 展示、导出等）
 - (NSArray<FirewallRule *> *_Nonnull)allRules;
@@ -144,6 +144,10 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
 
 - (BOOL)hostName:(NSString *_Nonnull)host matchesPattern:(NSString *_Nonnull)pattern;
 
+//匹配出站的规则
+-(FirewallRule*_Nonnull)firstMatchedRuleForOutBound:(NSString*_Nonnull)_remoteHostName
+                                         remotePort:(NSString*_Nonnull)_remotePort
+                                           protocol:(NSString*_Nonnull)_Protocol;
 
 @end
 

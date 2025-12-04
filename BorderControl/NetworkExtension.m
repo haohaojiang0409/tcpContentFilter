@@ -60,7 +60,6 @@ static NetworkExtension *sharedInstance = nil;
     
     NEFilterManager.sharedManager.localizedDescription = networkExtensionBundleId;
     NEFilterManager.sharedManager.enabled = true;
-      
     NEFilterManager.sharedManager.providerConfiguration = configuration;
 
     [NEFilterManager.sharedManager saveToPreferencesWithCompletionHandler:^(NSError * _Nullable error) {

@@ -284,18 +284,10 @@
 }
 
 
-- (NSArray<FirewallRule *> *)rulesForDirection:(FlowDirection)direction
-                                      protocol:(TransportProtocol)protocol {
-    NSString *dirStr = (direction == FlowDirectionOutbound) ? @"out" : @"in";
-    NSString *protoStr = nil;
-    switch (protocol) {
-        case TransportProtocolTCP:   protoStr = @"tcp"; break;
-        case TransportProtocolUDP:   protoStr = @"udp"; break;
-        case TransportProtocolICMP:  protoStr = @"icmp"; break;
-        default: return @[];
-    }
-    
-    NSString *key = [RuleCompositeKeyGenerator compositeKeyWithDirection:dirStr protocol:protoStr];
+- (NSArray<FirewallRule *> *)rulesForDirection:(FlowDirection)_direction
+                                      protocol:(NSString*)_protocol {
+    NSString *dirStr = (_direction == FlowDirectionOutbound) ? @"out" : @"in";
+    NSString *key = [RuleCompositeKeyGenerator compositeKeyWithDirection:dirStr protocol:_protocol];
     
     __block NSArray<FirewallRule *> *result = @[];
     dispatch_sync(self.syncQueue, ^{
@@ -315,71 +307,123 @@
     return [uniqueRules allObjects];
 }
 
-// FirewallRuleManager.m
-- (FirewallRule *_Nullable)firstMatchedRuleForHostname:(NSString *)hostname
-                                              remotePort:(NSInteger)remotePort
-                                               localPort:(NSInteger)localPort
-                                                protocol:(TransportProtocol)protocol
-                                               direction:(FlowDirection)direction {
+//// FirewallRuleManager.m
+//- (FirewallRule *_Nullable)firstMatchedRuleForHostname:(NSString *)hostname
+//                                              remotePort:(NSInteger)remotePort
+//                                               localPort:(NSInteger)localPort
+//                                                protocol:(TransportProtocol)protocol
+//                                               direction:(FlowDirection)direction {
+//    // 1. 获取该 direction + protocol 下的所有规则
+//    NSArray<FirewallRule *> *candidateRules = [self rulesForDirection:direction protocol:protocol];
+//    if (candidateRules.count == 0) {
+//        NSLog(@"firstMatchedRuleForHostname : candidataeRules is nil");
+//        return nil;
+//    }
+//
+//    FirewallRule *bestMatch = nil;
+//    NSInteger highestLevel = NSNotFound;
+//
+//    for (FirewallRule *rule in candidateRules) {
+//        BOOL matched = NO;
+//
+//        if (direction == FlowDirectionOutbound) {
+//            // 出站：检查每个 fiveTuple 的 hostName 和 remotePort 是否在范围内
+//            for (fiveINetTuple *tuple in rule.fiveTuples) {
+//                // 端口匹配：remotePort ∈ [portStart, portEnd]
+//                if (remotePort < tuple.portStart || remotePort > tuple.portEnd) {
+//                    NSLog(@"port is not in range");
+//                    continue;
+//                }
+//
+//                // 主机名匹配（支持 nil 表示任意）
+//                if (tuple.hostName == hostname) {
+//                    matched = YES;
+//                    NSLog(@"hostname is matched");
+//                    break;
+//                }
+//
+//                // 支持通配符 *.example.com
+//                if ([self hostName:hostname matchesPattern:tuple.hostName]) {
+//                    matched = YES;
+//                    NSLog(@"hostname.* is matched");
+//                    break;
+//                }
+//            }
+//        } else {
+//            NSArray<NSString*>* domainNames = resolveAddress(hostname);
+//            NSString* firstHostName = domainNames.firstObject;
+//            NSLog(@"[%@] is the first element in domainNames" , firstHostName);
+//            dispatch_barrier_async(self.syncQueue,^{
+//                self.ipToHostnamesMap[hostname] = domainNames;
+//            });
+//            // 入站：只匹配本地端口（localPort），忽略 hostName（因不可靠）
+//            for (fiveINetTuple *tuple in rule.fiveTuples) {
+//                if (localPort < tuple.portStart || localPort > tuple.portEnd) {
+//                    continue;
+//                }
+//                
+//                if(tuple.ipEnd && tuple.ipStart && hostname){
+//                    uint32_t ip = strToIpv4Uint16(hostname);
+//                    if(ip <= tuple.ipEnd && ip >= tuple.ipStart){
+//                        matched = YES;
+//                    }
+//                }
+//            }
+//        }
+//
+//        if (matched) {
+//            // 选择 level 最高的规则（数值越大优先级越高）
+//            if (rule.level > highestLevel) {
+//                highestLevel = rule.level;
+//                bestMatch = rule;
+//            }
+//        }
+//    }
+//    
+//    return bestMatch;
+//}
+
+
+-(FirewallRule*)firstMatchedRuleForOutBound:(NSString*)_remoteHostName
+                                 remotePort:(NSString*)_remotePort
+                                   protocol:(NSString*)_Protocol{
     // 1. 获取该 direction + protocol 下的所有规则
-    NSArray<FirewallRule *> *candidateRules = [self rulesForDirection:direction protocol:protocol];
+    NSArray<FirewallRule *> *candidateRules = [self rulesForDirection:NETrafficDirectionOutbound protocol:_Protocol];
     if (candidateRules.count == 0) {
         NSLog(@"firstMatchedRuleForHostname : candidataeRules is nil");
         return nil;
+    }else{
+        NSLog(@"the number of rules is : %lu",(unsigned long)candidateRules.count);
     }
-
+    //2.开始逐个判断
     FirewallRule *bestMatch = nil;
     NSInteger highestLevel = NSNotFound;
-
-    for (FirewallRule *rule in candidateRules) {
-        BOOL matched = NO;
-
-        if (direction == FlowDirectionOutbound) {
-            // 出站：检查每个 fiveTuple 的 hostName 和 remotePort 是否在范围内
-            for (fiveINetTuple *tuple in rule.fiveTuples) {
-                // 端口匹配：remotePort ∈ [portStart, portEnd]
-                if (remotePort < tuple.portStart || remotePort > tuple.portEnd) {
-                    NSLog(@"port is not in range");
-                    continue;
-                }
-
-                // 主机名匹配（支持 nil 表示任意）
-                if (tuple.hostName == hostname) {
-                    matched = YES;
-                    NSLog(@"hostname is matched");
-                    break;
-                }
-
-                // 支持通配符 *.example.com
-                if ([self hostName:hostname matchesPattern:tuple.hostName]) {
-                    matched = YES;
-                    NSLog(@"hostname.* is matched");
-                    break;
-                }
+    for(FirewallRule* rule in candidateRules){
+        BOOL isMatched = NO;
+        // 3.出站：检查每个 fiveTuple 的 hostName 和 remotePort 是否在范围内
+        for (fiveINetTuple *tuple in rule.fiveTuples) {
+            // 端口匹配：remotePort ∈ [portStart, portEnd]
+            NSUInteger remotePort = [_remotePort integerValue];
+            NSLog(@"remote port :%lu , tuplestart : %hu , tupleend : %hu",(unsigned long)remotePort , tuple.portStart , tuple.portEnd);
+            if (remotePort < tuple.portStart || remotePort > tuple.portEnd) {
+                NSLog(@"port is not in range");
+                continue;
             }
-        } else {
-            NSArray<NSString*>* domainNames = resolveAddress(hostname);
-            NSString* firstHostName = domainNames.firstObject;
-            NSLog(@"[%@] is the first element in domainNames" , firstHostName);
-            dispatch_barrier_async(self.syncQueue,^{
-                self.ipToHostnamesMap[hostname] = domainNames;
-            });
-            // 入站：只匹配本地端口（localPort），忽略 hostName（因不可靠）
-            for (fiveINetTuple *tuple in rule.fiveTuples) {
-                if (localPort < tuple.portStart || localPort > tuple.portEnd) {
-                    continue;
-                }
-                
-                if(tuple.ipEnd && tuple.ipStart && hostname){
-                    uint32_t ip = strToIpv4Uint16(hostname);
-                    if(ip <= tuple.ipEnd && ip >= tuple.ipStart){
-                        matched = YES;
-                    }
-                }
+            // 主机名匹配（支持 nil 表示任意）
+            if (tuple.hostName == _remoteHostName) {
+                isMatched = YES;
+                NSLog(@"hostname is matched");
+                break;
+            }
+            // 支持通配符 *.example.com
+            if ([self hostName:_remoteHostName matchesPattern:tuple.hostName]) {
+                isMatched = YES;
+                NSLog(@"hostname.* is matched");
+                break;
             }
         }
-
-        if (matched) {
+        //4.如果匹配到了规则
+        if (isMatched) {
             // 选择 level 最高的规则（数值越大优先级越高）
             if (rule.level > highestLevel) {
                 highestLevel = rule.level;
@@ -387,10 +431,8 @@
             }
         }
     }
-    
     return bestMatch;
 }
-
 // 主机名通配符匹配工具方法（支持 *.example.com）
 - (BOOL)hostName:(NSString *)host matchesPattern:(NSString *)pattern {
     if ([host isEqualToString:pattern]) {

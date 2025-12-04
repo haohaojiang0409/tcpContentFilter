@@ -198,9 +198,9 @@
                     "tip": -1
                 },
                 "level": 9,
-                "direction": "in",
+                "direction": "out",
                 "proto": "tcp|udp",
-                "action": "pass",
+                "action": "blocked",
                 "policy_name": "sdgvsgddddsd111111fsdfdsfsdasasdsdascas",
                 "policy_id": "edr_fw_07cf18b3-881e-48d8-a8b6-de8c0d55a7bb",
                 "processes": [

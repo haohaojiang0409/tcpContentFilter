@@ -399,161 +399,153 @@ typedef struct {
 }
 
 #pragma mark - 处理流
+//1.建立连接之前还是之后：建立连接之前
+//2.扩展截获的是发往所有网卡的数据包？可以选，默认所有网卡
+//3.IPPROTO_UDP 和 NENetworkRuleProtocolUDP的区别？ 前者是应用于socket层，后者应用于IP层
 - (NEFilterNewFlowVerdict *)handleNewFlow:(NEFilterFlow *)flow {
     os_log(firewallLog , "handleNewFlow start");
     if (![flow isKindOfClass:[NEFilterSocketFlow class]]) {
         os_log(firewallLog , "[FLOW] Non-socket flow, allowing.");
         return [NEFilterNewFlowVerdict allowVerdict];
     }
-
+    
     NEFilterSocketFlow *socketFlow = (NEFilterSocketFlow *)flow;
-    
-    //远程端点
-    NWHostEndpoint *remoteEP = (NWHostEndpoint *)socketFlow.remoteEndpoint;
-    
-    //处理DNS请求
-    if([remoteEP.port isEqualToString:@"53"]){
-        return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:NO peekInboundBytes:0 filterOutbound:YES peekOutboundBytes:64];
-    }
-    //本地端点
-    NWHostEndpoint *localEP  = (NWHostEndpoint *)socketFlow.localEndpoint;
-    NSString *remoteHostName = nil;
-    //获取远程主机名：可能为ip
-    if(nil != socketFlow.URL.host){
-        NSLog(@"socket URL host is not nil");
-        remoteHostName = socketFlow.URL.host;
-    }else if(nil != socketFlow.remoteHostname){
-        NSLog(@"socket remoteHost Name is not nil");
-        remoteHostName = socketFlow.remoteHostname;
-    }else if(nil != remoteEP.hostname){
-        NSLog(@"remoteEP hostname is not nil");
-        remoteHostName = remoteEP.hostname;
-    }
-    //获取远程端口
-    NSInteger remotePort = [remoteEP.port integerValue];
-    //获取本地端口
-    NSInteger localPort  = [localEP.port integerValue];
-    //方向
-    NETrafficDirection direction = socketFlow.direction;
-    FlowDirection dir = (direction == NETrafficDirectionOutbound)
-                        ? FlowDirectionOutbound
-                        : FlowDirectionInbound;
-    //方向字符串
-    NSString *directionStr = (direction == NETrafficDirectionOutbound) ? @"OUT" : @"IN";
-    //协议字符串
-    NSString *protoStr = @"";
-    //协议
-    TransportProtocol proto;
-
-    if (socketFlow.socketProtocol == NENetworkRuleProtocolTCP) {
-        proto = TransportProtocolTCP;
-        protoStr = @"TCP";
-    } else if (socketFlow.socketProtocol == NENetworkRuleProtocolUDP) {
-        proto = TransportProtocolUDP;
-        protoStr = @"UDP";
-    } else {
-        protoStr = @"OTHER";
-        NSLog(@"----the flow is other protocol，default allowed----");
+    if (![flow isKindOfClass:[NEFilterSocketFlow class]]) {
         return [NEFilterNewFlowVerdict allowVerdict];
     }
-    // 初始化日志结构体
-    FlowLogEntry logEntry = {0}; // 清零
+//    NWEndpoint *remote = socketFlow.remoteEndpoint;
+//    NSString* _strHostName = ((NWHostEndpoint *)remote).hostname;
+//    NSString* _port = ((NWHostEndpoint *)remote).port;
+//    NSLog(@"New flow: %@:%@", _strHostName , _port);
+    
+    // 标记所有流都要数据
+    return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:YES peekInboundBytes:64 filterOutbound:YES peekOutboundBytes:64];
+    
+//    //方向
+//    NETrafficDirection direction = socketFlow.direction;
+//    
+//    FlowDirection dir = (direction == NETrafficDirectionOutbound) ? FlowDirectionOutbound : FlowDirectionInbound;
+//    //方向字符串
+//    NSString *directionStr = (direction == NETrafficDirectionOutbound) ? @"OUT" : @"IN";
+//    if (socketFlow.socketProtocol == NENetworkRuleProtocolTCP && [directionStr isEqualToString:@"OUT"]) {
+//        NSString* protoStr = @"TCP";
+//        os_log(firewallLog , "Protocol: %{public}@", protoStr);
+//        os_log(firewallLog , "Flow direction: %{public}@", directionStr);
+//        return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:NO peekInboundBytes:0 filterOutbound:YES peekOutboundBytes:128];
+//    } else if (socketFlow.socketProtocol == NENetworkRuleProtocolUDP && [directionStr isEqualToString:@"OUT"]) {
+//        NSString* protoStr = @"UDP";
+//        os_log(firewallLog , "Protocol: %{public}@", protoStr);
+//        os_log(firewallLog , "Flow direction: %{public}@", directionStr);
+//        return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:NO peekInboundBytes:0 filterOutbound:YES peekOutboundBytes:128];
+//    } else if (socketFlow.socketProtocol == NENetworkRuleProtocolTCP && [directionStr isEqualToString:@"IN"]){
+//        NSString* protoStr = @"TCP";
+//        os_log(firewallLog , "Protocol: %{public}@", protoStr);
+//        os_log(firewallLog , "Flow direction: %{public}@", directionStr);
+//        return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:YES peekInboundBytes:128 filterOutbound:NO peekOutboundBytes:0];
+//    } else if (socketFlow.socketProtocol == NENetworkRuleProtocolUDP && [directionStr isEqualToString:@"IN"]){
+//        NSString* protoStr = @"UDP";
+//        os_log(firewallLog , "Protocol: %{public}@", protoStr);
+//        os_log(firewallLog , "Flow direction: %{public}@", directionStr);
+//        return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:YES peekInboundBytes:128 filterOutbound:NO peekOutboundBytes:0];
+//    } else {
+//        NSLog(@"----the flow is other protocol，default allowed----");
+//        return [NEFilterNewFlowVerdict allowVerdict];
+//    }
 
-    // 填充字段
-    strncpy(logEntry.remoteHostname, remoteHostName.UTF8String, sizeof(logEntry.remoteHostname) - 1);
-    logEntry.remotePort = (int)remotePort;
-    logEntry.localPort = (int)localPort;
-    strncpy(logEntry.direction, [directionStr UTF8String], sizeof(logEntry.direction) - 1);
-    strncpy(logEntry.protocol, [protoStr UTF8String], sizeof(logEntry.protocol) - 1);
 
-    FirewallRuleManager *manager = [FirewallRuleManager sharedManager];
-    FirewallRule *matchedRule = [manager firstMatchedRuleForHostname:remoteHostName
-                                                           remotePort:remotePort
-                                                            localPort:localPort
-                                                             protocol:proto
-                                                            direction:dir];
-    if (matchedRule) {
-        NSString *ruleName = matchedRule.policyName ?: @"NULL";
-        strncpy(logEntry.matchedRule, ruleName.UTF8String, sizeof(logEntry.matchedRule) - 1);
-
-        if (!matchedRule.allow) {
-            strncpy(logEntry.verdict, "BLOCK", sizeof(logEntry.verdict) - 1);
-            os_log(firewallLog , "[BLOCK] Blocked by rule: %{public}@", ruleName);
-            [self appendFlowLogToFile:&logEntry];
-            return [NEFilterNewFlowVerdict dropVerdict];
-        } else {
-            strncpy(logEntry.verdict, "ALLOW", sizeof(logEntry.verdict) - 1);
-            os_log(firewallLog , "[ALLOW] Allowed by rule: %{public}@", ruleName);
-        }
-    } else {
-        strncpy(logEntry.verdict, "ALLOW", sizeof(logEntry.verdict) - 1);
-        os_log(firewallLog , "[ALLOW] No matching rule, default allow.");
-    }
-
-    [self appendFlowLogToFile:&logEntry];
-    return [NEFilterNewFlowVerdict allowVerdict];
+//    FirewallRule *matchedRule = [manager firstMatchedRuleForHostname:remoteHostName
+//                                                           remotePort:remotePort
+//                                                            localPort:localPort
+//                                                             protocol:proto
+//                                                            direction:dir];
+//    if (matchedRule) {
+//        NSString *ruleName = matchedRule.policyName ?: @"NULL";
+//
+//        if (!matchedRule.allow) {
+//            os_log(firewallLog , "[BLOCK] Blocked by rule: %{public}@", ruleName);
+//            return [NEFilterNewFlowVerdict dropVerdict];
+//        } else {
+//            os_log(firewallLog , "[ALLOW] Allowed by rule: %{public}@", ruleName);
+//        }
+//    } else {
+//        os_log(firewallLog , "[ALLOW] No matching rule, default allow.");
+//    }
 }
-
-#pragma mark - 将flow中的所有元数据加载到结构体，存入文本文件中
-- (void)appendFlowLogToFile:(const FlowLogEntry *)entry {
-    @autoreleasepool {
-        NSString *logPath = myFile;
-        
-        // 构造日志行
-        NSString *logLine = [NSString stringWithFormat:
-            @"%s\t%d\t%d\t%s\t%s\t%s\t%s\n",
-            entry->remoteHostname,
-            entry->remotePort,
-            entry->localPort,
-            entry->direction,
-            entry->protocol,
-            entry->verdict,
-            entry->matchedRule[0] ? entry->matchedRule : "(none)"
-        ];
-
-        NSFileHandle *file = [NSFileHandle fileHandleForWritingAtPath:logPath];
-        if (!file) {
-            // 文件不存在，先创建
-            [[NSFileManager defaultManager] createFileAtPath:logPath contents:nil attributes:nil];
-            file = [NSFileHandle fileHandleForWritingAtPath:logPath];
-        }
-        if (!file) {
-            os_log(firewallLog ,"ERROR: Cannot open log file at %{public}@", logPath);
-            return;
-        }else{
-            [file seekToEndOfFile];
-            [file writeData:[logLine dataUsingEncoding:NSUTF8StringEncoding]];
-            [file closeFile];
-            
-            [[IPCConnection shared] sendStr:logLine whthCompletionHandler:^(bool success){
-                if (!success)
-                {
-                    os_log(firewallLog , "Unable to send packet to app.");
-                }else{
-                    os_log(firewallLog , "connect with main App success");
-                }
-            }];
-        }
-    }
-}
-
-
-- (NEFilterDataVerdict *) handleOutboundDataFromFlow:(NEFilterFlow *) flow
-                                readBytesStartOffset:(NSUInteger) offset
-                                           readBytes:(NSData *) readBytes {
+///建立连接之前就可以获取到流
+- (NEFilterDataVerdict *)handleOutboundDataFromFlow:(NEFilterFlow *)flow
+                                readBytesStartOffset:(NSUInteger)offset
+                                           readBytes:(NSData *)readBytes {
     os_log(firewallLog , "handleOutboundDataCompleteForFlow");
-    if([self isDNSFlow:flow]){
-        NSString* domain = [self parseDNSQueryDomain:readBytes];
-        NSLog(@"DNS Query: %@", domain);
-        if ([domain hasSuffix:@".example.com"]) {
-            return [NEFilterDataVerdict dropVerdict]; // 拦截
+    
+    // 打印流ID
+    os_log(firewallLog , "Flow ID: %{public}@", flow.identifier);
+    // 获取当前时间
+    NSDate *currentDate = [NSDate date];
+    NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
+    [dateFormatter setDateFormat:@"yyyy-MM-dd HH:mm:ss.SSS"];
+    NSString *currentTimeString = [dateFormatter stringFromDate:currentDate];
+    
+    // 打印流ID和当前时间
+    os_log(firewallLog , "Flow ID: %{public}@, Time: %{public}@ ", flow.identifier, currentTimeString);
+    
+    FirewallRuleManager *manager = [FirewallRuleManager sharedManager];
+    NEFilterSocketFlow* socketFlow = (NEFilterSocketFlow*)flow;
+    NWHostEndpoint* remoteEP = socketFlow.remoteEndpoint;
+    NSString* remoteHostName = nil;
+    NSString* port = 0;
+
+    //1.获取远程主机名
+    if(nil != socketFlow.URL.host){
+        remoteHostName = socketFlow.URL.host;
+        os_log(firewallLog ,"---- %{public}@ socket URL host:%{public}@ is not nil" , flow.identifier , remoteHostName);
+    }else if(nil != socketFlow.remoteHostname){
+        remoteHostName = socketFlow.remoteHostname;
+        os_log(firewallLog ,"---- %{public}@ socket remoteHost Name:%{public}@ is not nil " , flow.identifier , remoteHostName);
+    }else if(nil != remoteEP.hostname){
+        remoteHostName = remoteEP.hostname;
+        os_log(firewallLog ,"---- %{public}@ remoteEP hostname:%{public}@is not nil"  , flow.identifier , remoteHostName);
+    }
+    //2.判断是否是IPV4地址
+    BOOL isIPv4 = NO;
+    if (remoteHostName.length > 0) {
+        struct in_addr addr;
+        if (inet_pton(AF_INET, [remoteHostName UTF8String], &addr) == 1) {
+            isIPv4 = YES;
+            os_log(firewallLog, "---- %{public}@ host '%{public}@' is IPv4 address", flow.identifier, remoteHostName);
+        } else {
+            os_log(firewallLog, "---- %{public}@ host '%{public}@' is a domain name", flow.identifier, remoteHostName);
         }
     }
-    return [NEFilterDataVerdict allowVerdict];
-}
-
-- (NEFilterDataVerdict *)handleInboundDataCompleteForFlow:(NEFilterFlow *)flow {
-    os_log(firewallLog , "handleInboundDataCompleteForFlow");
+    if(IPPROTO_TCP == socketFlow.socketProtocol){
+        os_log(firewallLog ,"---- %{public}@ isTCPFlow----",flow.identifier);
+        ///出站只获取远端域名和远端端口即可
+        //1.获取远程端口
+        port = remoteEP.port;
+        //2.判断域名是否为空
+        if(!isIPv4){
+            FirewallRule* matchedRule = [manager firstMatchedRuleForOutBound:remoteHostName remotePort:port protocol:@"tcp"];
+            if(matchedRule && matchedRule.allow == NO){
+                os_log(firewallLog, "==== firewallRule is matched : %{public}@ ",remoteHostName);
+                return [NEFilterDataVerdict dropVerdict];
+            }
+        }else{
+            os_log(firewallLog ,"the remoteHostName is IPv4 address");
+        }
+    }else if(IPPROTO_UDP == socketFlow.socketProtocol){
+        if([self isDNSFlow:flow]){
+            //是DNS就保存域名和ip的对应关系
+            NSString* domain = [self parseDNSQueryDomain:readBytes];
+            os_log(firewallLog , "[ID : %{public}@ ]DNS Query: %{public}@",flow.identifier, domain);
+            if ([domain hasSuffix:@"www.baidu.com"]) {
+                return [NEFilterDataVerdict dropVerdict]; // 拦截
+            }
+        }else{
+            os_log(firewallLog ,"---- %{public}@  isUDPFlow ----",flow.identifier);
+        }
+    }else{
+        os_log(firewallLog ,"---- %{public}@  is not socket Flow ----" , flow.identifier);
+    }
+    
     return [NEFilterDataVerdict allowVerdict];
 }
 
@@ -577,6 +569,16 @@ typedef struct {
     return [port isEqualToString:@"53"];
 }
 
+-(BOOL)isHTTPFlow:(NEFilterFlow*)flow{
+    NEFilterSocketFlow* socketFlow = (NEFilterSocketFlow*)flow;
+    NWEndpoint* remoteEndpoint = socketFlow.remoteEndpoint;
+
+    NWHostEndpoint* hostEndpoint = (NWHostEndpoint*)remoteEndpoint;
+    NSString* port = hostEndpoint.port;
+    
+    //HTTP标准是80
+    return [port isEqualToString:@"80"];
+}
 - (NSString *)parseDNSQueryDomain:(NSData *)data {
     if (!data || data.length < 12 + 1) {
         return nil; // 至少要有 header + 1 字节域名
@@ -647,60 +649,12 @@ typedef struct {
     return [domain copy];
 }
 
-//
-//+ (void)initialize{
-//    dispatch_once(&onceToken, ^{
-//        gIPToHostnameMap = [[NSMutableDictionary alloc] init];
-//    });
-//}
+- (NEFilterDataVerdict *) handleInboundDataFromFlow:(NEFilterFlow *) flow
+                                readBytesStartOffset:(NSUInteger) offset
+                                           readBytes:(NSData *) readBytes{
 
-//static ParsedPacketInfo parsePacket(const void *packetBytes, size_t packetLength) {
-//    ParsedPacketInfo info = {0};
-//    info.isValid = NO;
-//
-//    if (packetLength < 20) return info; // IPv4 最小 20 字节
-//
-//    const uint8_t *bytes = (const uint8_t *)packetBytes;
-//
-//    // IPv4: Version and IHL
-//    uint8_t versionIHL = bytes[0];
-//    if ((versionIHL >> 4) != 4) return info; // 不是 IPv4
-//
-//    uint8_t ihl = (versionIHL & 0x0F) * 4;
-//    if (ihl < 20 || packetLength < ihl) return info;
-//
-//    uint8_t protocol = bytes[9];
-//    uint32_t srcIP = *(uint32_t *)(bytes + 12);
-//    uint32_t dstIP = *(uint32_t *)(bytes + 16);
-//
-//    // 端口只对 TCP/UDP 有意义
-//    uint16_t srcPort = 0, dstPort = 0;
-//
-//    if (protocol == IPPROTO_TCP || protocol == IPPROTO_UDP) {
-//        if (packetLength < ihl + 4) return info;
-//        srcPort = *(uint16_t *)(bytes + ihl);
-//        dstPort = *(uint16_t *)(bytes + ihl + 2);
-//        // 注意：网络字节序，但比较时保持一致即可
-//    }
-//
-//    info.srcIP = srcIP;
-//    info.dstIP = dstIP;
-//    info.srcPort = ntohs(srcPort);
-//    info.dstPort = ntohs(dstPort);
-//    info.isValid = YES;
-//
-//    if (protocol == IPPROTO_TCP) {
-//        info.protocol = @"tcp";
-//    } else if (protocol == IPPROTO_UDP) {
-//        info.protocol = @"udp";
-//    } else if (protocol == IPPROTO_ICMP) {
-//        info.protocol = @"icmp";
-//    } else {
-//        info.protocol = @"other";
-//    }
-//
-//    return info;
-//}
+    return [NEFilterDataVerdict allowVerdict];
+}
 
 @end
 
