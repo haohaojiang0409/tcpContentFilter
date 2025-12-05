@@ -19,7 +19,7 @@
     // 2️⃣ 加载并注册 JSON 规则（内部会清空旧规则）
     [self loadAndRegisterFirewallRules];
 
-    //3 初始化日志变量
+    // 4️⃣ 初始化日志变量
     firewallLog = os_log_create("com.eagleyun.BorderControl", "Network");
     os_log(firewallLog , "Filter started");
        NSFileManager *filemgr;
@@ -123,7 +123,7 @@
     }
 
     // 标记所有流都要数据
-    return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:NO peekInboundBytes:0 filterOutbound:YES peekOutboundBytes:64];
+    return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:YES peekInboundBytes:1024 filterOutbound:NO peekOutboundBytes:0];
 
 }
 
@@ -178,12 +178,7 @@
     }else if(IPPROTO_UDP == socketFlow.socketProtocol){
         //分两种情况：DNS-UDP和其他UDP
         if([self isDNSFlow:flow]){
-            //是DNS就保存域名和ip的对应关系
-            NSString* domain = [self parseDNSQueryDomain:readBytes];
-            os_log(firewallLog , "[ID : %{public}@ ]DNS Query: %{public}@",flow.identifier, domain);
-            if ([domain hasSuffix:@".example.com"]) {
-                return [NEFilterDataVerdict dropVerdict]; // 拦截
-            }
+            os_log(firewallLog , "[ID : %{public}@ is DNS",flow.identifier);
         }else{
             os_log(firewallLog ,"---- %{public}@  isUDPFlow ----",flow.identifier);
             matchedRule = [manager firstMatchedRuleForOutBound:remoteHostName remotePort:port protocol:@"udp"];
@@ -220,78 +215,7 @@
     return [port isEqualToString:@"53"];
 }
 
-#pragma mark -- 此函数暂时用不到 DNS报文解析获取域名用
-- (NSString *)parseDNSQueryDomain:(NSData *)data {
-    if (!data || data.length < 12 + 1) {
-        return nil; // 至少要有 header + 1 字节域名
-    }
-
-    const uint8_t *bytes = (const uint8_t *)[data bytes];
-    NSUInteger index = 12; // 跳过 12 字节 DNS header
-    NSUInteger originalIndex = index;
-    NSMutableString *domain = [NSMutableString string];
-    int jumpCount = 0;
-    const int maxJumps = 10; // 防止指针循环
-
-    while (index < data.length && jumpCount < maxJumps) {
-        uint8_t len = bytes[index];
-
-        // 检查是否为压缩指针 (RFC 1035: 14. 章节)
-        if ((len & 0xC0) == 0xC0) {
-            if (index + 1 >= data.length) {
-                NSLog(@"------- point is not full ------ ");
-                return nil; // 指针不完整
-            }
-            // 指针占 2 字节，高 2 位是标志，低 14 位是偏移
-            uint16_t pointer = ((len & 0x3F) << 8) | bytes[index + 1];
-            if (pointer >= 12) { // 偏移必须 >= 12（不能指向 header）
-                index = pointer;
-                jumpCount++;
-                continue;
-            } else {
-                NSLog(@"------- point is not full ------ ");
-                return nil; // 无效指针
-            }
-        }
-
-        // 长度为 0 表示域名结束
-        if (len == 0) {
-            NSLog(@"------- len == 0 break ------ ");
-            break;
-        }
-
-        // 普通标签
-        if (index + 1 + len > data.length) {
-            NSLog(@"------- index is beyond length ------ ");
-            return nil; // 标签超出数据范围
-        }
-
-        // 提取标签内容
-        NSString *label = [[NSString alloc] initWithBytes:&bytes[index + 1]
-                                                  length:len
-                                                encoding:NSUTF8StringEncoding];
-        if (!label) {
-            return nil; // 非 UTF-8 标签（理论上不应发生）
-        }
-
-        if (domain.length > 0) {
-            [domain appendString:@"."];
-        }
-        [domain appendString:label];
-
-        index += 1 + len; // 跳过长度字节 + 标签内容
-    }
-
-    // 如果 domain 为空，说明解析失败
-    if (domain.length == 0) {
-        NSLog(@"----domain is nil----");
-        return nil;
-    }
-    NSLog(@"---domain is got successfully----");
-    return [domain copy];
-}
-
-#pragma mark -- 处理入站的流，暂未开发
+#pragma mark -- 处理入站的流
 - (NEFilterDataVerdict *) handleInboundDataFromFlow:(NEFilterFlow *) flow
                                 readBytesStartOffset:(NSUInteger) offset
                                            readBytes:(NSData *) readBytes{
@@ -300,6 +224,7 @@
     NWHostEndpoint* remoteEP = socketFlow.remoteEndpoint;
     //1.获取远程IP
     remoteHostName = remoteEP.hostname;
+    NSString* port = remoteEP.port;
     os_log(firewallLog , "---- %{public}@ socket remoteEP ip Name:%{public}@ is not nil " , flow.identifier , remoteHostName);
     
     //2.进行入站匹配
@@ -308,13 +233,189 @@
     [dateFormatter setDateFormat:@"yyyy-MM-dd HH:mm:ss.SSS"];
     NSString *currentTimeString = [dateFormatter stringFromDate:currentDate];
     
-    // 打印流ID和当前时间
+    //3. 打印流ID和当前时间
     os_log(firewallLog , "Flow ID: %{public}@, Time: %{public}@ ", flow.identifier, currentTimeString);
     
     FirewallRuleManager *manager = [FirewallRuleManager sharedManager];
+    
+    FirewallRule * rule = nil;
+    //4. 判断协议
+    if(IPPROTO_TCP == socketFlow.socketProtocol){
+        os_log(firewallLog , "---socketFlow[%{public}@] is a tcp flow---",flow.identifier);
+        rule = [manager firstMatchedRuleForInBound:remoteHostName localPort:port protocol:@"tcp"];
+    } else if (IPPROTO_UDP == socketFlow.socketProtocol) {
+        // 入站 UDP：可能是 DNS 响应
+        if ([self isDNSResponseWithData:readBytes]) {
+            os_log(firewallLog, "---socketFlow[%{public}@] is a DNS RESPONSE---", flow.identifier);
+            
+            // ✅ 可在此处解析 DNS Response 获取域名 ↔ IP 映射
+            [self parseDNSResponse:readBytes forFlow:flow];
+            // 注意：DNS 响应通常应放行，除非你要做 DNS 劫持/过滤
+            return [NEFilterDataVerdict allowVerdict];
+        } else {
+            os_log(firewallLog, "---socketFlow[%{public}@] is a UDP flow---", flow.identifier);
+            rule = [manager firstMatchedRuleForInBound:remoteHostName localPort:port protocol:@"udp"];
+        }
+    }else{
+        os_log(firewallLog , "===the flow[%{public}@] is not network flow===",flow.identifier);
+    }
+    if(rule && rule.allow == NO){
+        return [NEFilterDataVerdict dropVerdict];
+    }
     return [NEFilterDataVerdict allowVerdict];
 }
 
+#pragma mark -- 判断是否是DNS response报文
+- (BOOL)isDNSResponseWithData:(NSData *)data {
+    if (data.length < 12) {
+        return NO; // DNS header 至少 12 字节
+    }
+    
+    const uint8_t *bytes = [data bytes];
+    uint8_t flagsByte = bytes[2]; // 第 3 个字节（索引从 0 开始）
+    
+    // QR 位是 flagsByte 的最高位（bit 7）
+    BOOL isResponse = (flagsByte & 0x80) != 0; // 0x80 = 1000 0000
+    
+    return isResponse;
+}
+
+#pragma mark -- 解析 DNS Response，提取域名和IP映射
+- (void)parseDNSResponse:(NSData *)data forFlow:(NEFilterFlow *)flow {
+    //1.跳过DNS头部
+    if (data.length < 12) return;
+    
+    const uint8_t *bytes = (const uint8_t *)[data bytes];
+    //2.读取QDcount和ANCount数量，由网络字节序转为主机序
+    uint16_t qdCount = ntohs(*(uint16_t*)(bytes + 4));  // Questions count
+    uint16_t anCount = ntohs(*(uint16_t*)(bytes + 6));  // Answers count
+    if (qdCount == 0 || anCount == 0) {
+        os_log(firewallLog, "DNS response has no question or answer");
+        return;
+    }
+    
+    // Step 1: 解析 Question -> 获取原始域名
+    //从偏移12开始，开始读取域名
+    NSString *queryDomain = [self parseDomainFromDNSAtOffset:&bytes[12] data:data startOffset:12];
+    if (!queryDomain || queryDomain.length == 0) {
+        os_log(firewallLog, "Failed to parse query domain in DNS response");
+        return;
+    }
+    
+    // Step 2: 跳过 Question Section（每个 Question = QNAME + QTYPE(2) + QCLASS(2)）
+    NSUInteger offset = 12;
+    NSString *dummy = [self parseDomainFromDNSAtOffset:&bytes[offset] data:data startOffset:offset];
+    if (!dummy) return;
+    // 计算实际跳过的字节数（需重新解析以获取长度）
+    NSUInteger questionEnd = [self getDomainLengthAtOffset:offset data:data];
+    if (questionEnd == NSNotFound) return;
+    offset = questionEnd + 4; // +4 for QTYPE + QCLASS
+    
+    // Step 3: 遍历 Answer Section
+    for (int i = 0; i < anCount && offset < data.length; i++) {
+        // 跳过 NAME（可能是压缩指针）
+        NSUInteger nameStart = offset;
+        NSString *name = [self parseDomainFromDNSAtOffset:&bytes[offset] data:data startOffset:offset];
+        if (!name) break;
+        NSUInteger nameEnd = [self getDomainLengthAtOffset:nameStart data:data];
+        if (nameEnd == NSNotFound) break;
+        
+        if (offset + (nameEnd - nameStart) + 10 > data.length) break; // 至少还有 TYPE(2)+CLASS(2)+TTL(4)+RDLENGTH(2)
+        
+        uint16_t type = ntohs(*(uint16_t*)(bytes + nameEnd + 0));
+        // uint16_t class = ntohs(*(uint16_t*)(bytes + nameEnd + 2));
+        // uint32_t ttl = ntohl(*(uint32_t*)(bytes + nameEnd + 4));
+        uint16_t rdlength = ntohs(*(uint16_t*)(bytes + nameEnd + 8));
+        const uint8_t *rdata = &bytes[nameEnd + 10];
+        
+        if (type == 1 && rdlength == 4) { // A record (IPv4)
+            struct in_addr addr;
+            memcpy(&addr, rdata, 4);
+            char ipStr[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &addr, ipStr, INET_ADDRSTRLEN);
+            NSString *ip = [NSString stringWithCString:ipStr encoding:NSUTF8StringEncoding];
+            
+            os_log(firewallLog, "[DNS Cache] %{public}@ → %{public}@", queryDomain, ip);
+            
+            // 存入全局缓存（假设你有 DomainIPCache 单例）
+            [[DomainIPCache sharedCache] addMappingForDomain:queryDomain ip:ip];
+            
+        } else if (type == 28 && rdlength == 16) { // AAAA record (IPv6)
+            struct in6_addr addr6;
+            memcpy(&addr6, rdata, 16);
+            char ip6Str[INET6_ADDRSTRLEN];
+            inet_ntop(AF_INET6, &addr6, ip6Str, INET6_ADDRSTRLEN);
+            NSString *ip6 = [NSString stringWithCString:ip6Str encoding:NSUTF8StringEncoding];
+            os_log(firewallLog, "[DNS Cache] %{public}@ → %{public}@", queryDomain, ip6);
+            [[DomainIPCache sharedCache] addMappingForDomain:queryDomain ip:ip6];
+        }
+        
+        // 移动到下一个 RR
+        offset = nameEnd + 10 + rdlength;
+    }
+}
+
+- (NSString *)parseDomainFromDNSAtOffset:(const uint8_t *)start data:(NSData *)data startOffset:(NSUInteger)startOffset {
+    NSMutableString *domain = [NSMutableString string];
+    const uint8_t *bytes = (const uint8_t *)[data bytes];
+    NSUInteger offset = startOffset;
+    int jumps = 0;
+    const int maxJumps = 5;
+    
+    while (offset < data.length && jumps < maxJumps) {
+        uint8_t len = bytes[offset];
+        if (len == 0) {
+            break; // end of name
+        }
+        
+        if ((len & 0xC0) == 0xC0) {
+            // Compressed pointer
+            if (offset + 1 >= data.length) return nil;
+            uint16_t pointer = ((len & 0x3F) << 8) | bytes[offset + 1];
+            if (pointer >= data.length) return nil;
+            offset = pointer;
+            jumps++;
+            continue;
+        }
+        
+        if (offset + 1 + len > data.length) return nil;
+        
+        NSString *label = [[NSString alloc] initWithBytes:&bytes[offset + 1]
+                                                  length:len
+                                                encoding:NSASCIIStringEncoding]; // DNS labels are ASCII
+        if (!label) return nil;
+        
+        if (domain.length > 0) [domain appendString:@"."];
+        [domain appendString:label];
+        
+        offset += 1 + len;
+    }
+    
+    return domain.length > 0 ? [domain copy] : nil;
+}
+
+- (NSUInteger)getDomainLengthAtOffset:(NSUInteger)offset data:(NSData *)data {
+    const uint8_t *bytes = (const uint8_t *)[data bytes];
+    NSUInteger originalOffset = offset;
+    int jumps = 0;
+    const int maxJumps = 5;
+    
+    while (offset < data.length && jumps < maxJumps) {
+        uint8_t len = bytes[offset];
+        if (len == 0) {
+            return offset + 1; // include the zero byte
+        }
+        if ((len & 0xC0) == 0xC0) {
+            // Pointer: consumes 2 bytes at current position
+            return originalOffset + 2;
+        }
+        if (offset + 1 + len > data.length) {
+            return NSNotFound;
+        }
+        offset += 1 + len;
+    }
+    return NSNotFound;
+}
 @end
 
     

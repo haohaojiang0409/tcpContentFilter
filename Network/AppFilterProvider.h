@@ -11,6 +11,7 @@
 #import "tools.h"
 #import "XPCServer.h"
 #import "log.h"
+#import "DomainIPCache.h"
 //@interface AppFilterProvider : NEFilterDataProvider
 //
 //+ (void)initialize;
@@ -25,4 +26,6 @@ static os_log_t _Nonnull firewallLog;
                      withRawBytes: (const void *_Nonnull) packetBytes
                         length: (const size_t) packetLength;
 - (BOOL)isDNSFlow:(NEFilterFlow * _Nonnull)flow;
+
+
 @end

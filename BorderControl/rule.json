@@ -61,7 +61,7 @@
                 "level": 17,
                 "direction": "in",
                 "proto": "tcp|udp",
-                "action": "pass",
+                "action": "blocked",
                 "policy_name": "firewall-test-update-update",
                 "policy_id": "edr_fw_aa5fdaba-a45d-46d5-8f70-ef537a09ed11",
                 "processes": [
@@ -71,9 +71,9 @@
                 ],
                 "tuples": [
                     {
-                        "source_ip": "0.0.0.0|0.0.0.0",
+                        "source_ip": "0.0.0.0",
                         "dst_port": [
-                            "90"
+                            "80"
                         ]
                     }
                 ]
@@ -99,21 +99,26 @@
             {
                 "chinese": {
                     "title": "禁止访问",
-                    "suggestion": "基于企业安全管理要求，以下访问被禁止。{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
+                    "suggestion": "基于企业安全管理要求， {{domain}}:{{dstport}} | {{srcip}}:{{srcport}} -\u003e {{dstip}}:{{dstport}}  禁止访问0",
                     "tip": -1
                 },
                 "english": {
                     "title": "Prohibited Access",
-                    "suggestion": "Based on enterprise security management requirements, the following access is denied.{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
+                    "suggestion": "Based on enterprise security management requirements, access to Address: #Domain Address / #IP:Port is denied.",
                     "tip": -1
                 },
-                "level": 15,
+                "level": 2,
                 "direction": "in",
                 "proto": "tcp|udp",
                 "action": "pass",
-                "policy_name": "sdgvsgdssdsdascas",
-                "policy_id": "edr_fw_64aaa80f-0ed1-4364-ab85-87fcfd81d44a"
+                "policy_name": "jth_chr",
+                "policy_id": "edr_fw_42dfc63c-7d3c-4d85-8d5b-296c8c1427b1",
+                "tuples": [{
+                    "source_ip": "0.0.0.0",
+                    "dst_port": ["443"]
+                }]
             },
+    
             {
                 "chinese": {
                     "title": "禁止访问",
