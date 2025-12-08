@@ -23,6 +23,8 @@ NS_ASSUME_NONNULL_BEGIN
 /// 清空缓存（调试用）
 - (void)clear;
 
+// 所有域名和ip的映射
+- (NSDictionary<NSString *, NSArray<NSString *> *> *)allDomainToIPsMap;
 @end
 
 NS_ASSUME_NONNULL_END

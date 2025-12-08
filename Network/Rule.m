@@ -26,7 +26,7 @@
 }
 @end
 
-///ip和域名存储类
+#pragma mark -- ip和域名存储类
 @implementation fiveINetTuple
 
 - (instancetype)initWithIpStart:(uint32_t)ipStart
@@ -45,7 +45,7 @@
 }
 @end
 
-///防火墙具体规则类
+#pragma mark -- 防火墙具体规则类
 @implementation FirewallRule
 
 - (instancetype)init {
@@ -78,11 +78,6 @@
     return self;
 }
 
-
-- (BOOL)isDNSRule {
-    return YES;
-}
-
 + (NSArray<FirewallRule *> *)rulesWithDictionary:(NSDictionary *)dict {
     // 1. 解析 direction
     NSString *dirStr = dict[@"direction"];
@@ -91,12 +86,10 @@
         return @[];
     }
     FlowDirection direction = [dirStr isEqualToString:@"out"] ? FlowDirectionOutbound : FlowDirectionInbound;
-    NSString *dirLog = (direction == FlowDirectionOutbound) ? @"OUT" : @"IN";
 
     // 2. 解析 action
     NSString *action = dict[@"action"];
     BOOL allow = [action isEqualToString:@"pass"]; // "block" → NO
-    NSString *actionLog = allow ? @"PASS" : @"BLOCK";
 
     // 3. 解析元数据
     NSString *policyName = dict[@"policy_name"] ?: @"(unnamed)";
@@ -130,7 +123,6 @@
         else if (p == TransportProtocolUDP) [protoLogs addObject:@"UDP"];
         else if (p == TransportProtocolICMP) [protoLogs addObject:@"ICMP"];
     }
-    NSString *protoSummary = [protoLogs componentsJoinedByString:@", "];
 
     // 5. 解析五元组
     NSMutableArray<fiveINetTuple *> *tuples = [NSMutableArray array];
@@ -273,7 +265,6 @@
             }
             // 🔽 按 level 降序插入（高优先级在前）
             NSInteger insertIndex = [self indexOfInsertionForRule:rule inSortedArray:group];
-            NSLog(@"insertIndex : %ld level of rule : %ld" , (long)insertIndex , (long)rule.level);
             [group insertObject:rule atIndex:insertIndex];
         }
     });
@@ -336,10 +327,7 @@
     // 1. 获取该 direction + protocol 下的所有规则
     NSArray<FirewallRule *> *candidateRules = [self rulesForDirection:FlowDirectionOutbound protocol:_Protocol];
     if (candidateRules.count == 0) {
-        NSLog(@"firstMatchedRuleForHostname : candidataeRules is nil");
         return nil;
-    }else{
-        NSLog(@"the number of rules is : %lu",(unsigned long)candidateRules.count);
     }
     //2.判断是否是IPV4地址,出站只获取远端域名/ip和远端端口即可
     BOOL isIPv4 = NO;
@@ -356,19 +344,17 @@
         for (fiveINetTuple *tuple in rule.fiveTuples) {
             // 端口匹配：remotePort ∈ [portStart, portEnd]
             NSUInteger remotePort = [_remotePort integerValue];
-            NSLog(@"remote port :%lu , tuplestart : %hu , tupleend : %hu",(unsigned long)remotePort , tuple.portStart , tuple.portEnd);
             if (remotePort < tuple.portStart || remotePort > tuple.portEnd) {
-                NSLog(@"port is not in range");
+                //NSLog(@"port is not in range");
                 continue;
             }
             // 主机名匹配（支持 nil 表示任意）
             if(!isIPv4){
                 if ([tuple.hostName isEqualToString:_remoteHostName]) {
                     isMatched = YES;
-                    NSLog(@"hostname is matched");
                     break;
                 }else{
-                    NSLog(@"hostname is not matched and tuple.hostName : %@ != %@", tuple.hostName , _remoteHostName);
+                    //NSLog(@"hostname is not matched and tuple.hostName : %@ != %@", tuple.hostName , _remoteHostName);
                 }
             }else {
                 // IPv4 匹配
@@ -376,14 +362,14 @@
                 if (tuple.ipStart == 0 && tuple.ipEnd == 0) {
                     // 规则未指定 IP 范围 → 匹配任意 IP
                     isMatched = YES;
-                    NSLog(@"IP wildcard (0.0.0.0-0.0.0.0) matched for %@", _remoteHostName);
+                    //NSLog(@"IP wildcard (0.0.0.0-0.0.0.0) matched for %@", _remoteHostName);
                     break;
                 }else if (remoteIp >= tuple.ipStart && remoteIp <= tuple.ipEnd) {
                     isMatched = YES;
-                    NSLog(@"IP range matched: %@ in [%u, %u]", _remoteHostName, tuple.ipStart, tuple.ipEnd);
+                    //NSLog(@"IP range matched: %@ in [%u, %u]", _remoteHostName, tuple.ipStart, tuple.ipEnd);
                     break;
                 }else{
-                    NSLog(@"IP %@ NOT in range [%u, %u]", _remoteHostName, tuple.ipStart, tuple.ipEnd);
+                    //NSLog(@"IP %@ NOT in range [%u, %u]", _remoteHostName, tuple.ipStart, tuple.ipEnd);
                 }
             }
         }
@@ -421,11 +407,11 @@
         // 3.入站：检查每个 fiveTuple 的 hostName 和 remotePort 是否在范围内
         for (fiveINetTuple *tuple in rule.fiveTuples) {
             // 本地端口匹配：remotePort ∈ [portStart, portEnd]
-            NSLog(@"tuplestart : %hu , tupleend : %hu , tupleipstart : %u , tupleipend : %u",tuple.portStart , tuple.portEnd , tuple.ipStart , tuple.ipEnd);
+//            NSLog(@"tuplestart : %hu , tupleend : %hu , tupleipstart : %u , tupleipend : %u",tuple.portStart , tuple.portEnd , tuple.ipStart , tuple.ipEnd);
             NSUInteger Port = [_localPort integerValue];
-            NSLog(@"local port :%lu , tuplestart : %hu , tupleend : %hu",(unsigned long)Port , tuple.portStart , tuple.portEnd);
+//            NSLog(@"local port :%lu , tuplestart : %hu , tupleend : %hu",(unsigned long)Port , tuple.portStart , tuple.portEnd);
             if (Port < tuple.portStart || Port > tuple.portEnd) {
-                NSLog(@"port is not in range");
+//                NSLog(@"port is not in range");
                 continue;
             }
             // ip匹配（支持 nil 表示任意）
@@ -435,14 +421,14 @@
                 //如果ip为0.0.0.0那么匹配所有ip
                 if(tuple.ipStart == 0 && tuple.ipEnd == 0){
                     isMatched = YES;
-                    NSLog(@"IP wildcard (0.0.0.0-0.0.0.0) matched for %@", _remoteIP);
+                    //NSLog(@"IP wildcard (0.0.0.0-0.0.0.0) matched for %@", _remoteIP);
                     break;
                 }else if(remoteIp >= tuple.ipStart && remoteIp <= tuple.ipEnd){
                     isMatched = YES;
-                    NSLog(@"IP range matched: %@ in [%u, %u]", _remoteIP, tuple.ipStart, tuple.ipEnd);
+                    //NSLog(@"IP range matched: %@ in [%u, %u]", _remoteIP, tuple.ipStart, tuple.ipEnd);
                     break;
                 }else{
-                    NSLog(@"IP %@ NOT in range [%u, %u]", _remoteIP, tuple.ipStart, tuple.ipEnd);
+                    //NSLog(@"IP %@ NOT in range [%u, %u]", _remoteIP, tuple.ipStart, tuple.ipEnd);
                     break;
                 }
             }else{
@@ -453,7 +439,7 @@
             return rule;
         }
     }
-    NSLog(@"---don't have any matched rule---");
+//    NSLog(@"---don't have any matched rule---");
     return nil;
 }
 

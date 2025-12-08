@@ -11,12 +11,13 @@
 #import "log.h"
 #import "AppFilterProvider.h"
 
-// FirewallEnums.h
+// 方向
 typedef NS_ENUM(NSUInteger, FlowDirection) {
     FlowDirectionOutbound,
     FlowDirectionInbound
 };
 
+// 协议
 typedef NS_ENUM(NSUInteger, TransportProtocol) {
     TransportProtocolTCP,
     TransportProtocolUDP,
@@ -24,7 +25,7 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
     TransportProtocolUnknown
 };
 
-// 复合键生成器：将「方向+协议」转为唯一字符串Key
+#pragma mark -- 复合键生成器：将「方向+协议」转为唯一字符串Key
 @interface RuleCompositeKeyGenerator : NSObject
 // 生成复合键（方向：in/out + 协议：tcp/udp/icmp）
 + (NSString *)compositeKeyWithDirection:(NSString *)direction protocol:(NSString *)protocol;
@@ -57,6 +58,7 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
 @end
 
 
+#pragma mark -- 防火墙单个规则类
 @interface FirewallRule : NSObject
 
 /// 匹配方向：出站 / 入站
@@ -116,8 +118,10 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
 #pragma mark - 规则管理类，存储规则和方向-协议的对应关系
 @interface FirewallRuleManager : NSObject
 
+//复合键对应的一组规则
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSMutableArray<FirewallRule *> *> * _Nonnull ruleGroups;
 
+//队列
 @property (nonatomic, strong) dispatch_queue_t _Nonnull syncQueue;
 
 //存储ip和域名的映射：一个ip可能对应多个域名

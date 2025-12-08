@@ -117,13 +117,8 @@
         return [NEFilterNewFlowVerdict allowVerdict];
     }
     
-    NEFilterSocketFlow *socketFlow = (NEFilterSocketFlow *)flow;
-    if (![flow isKindOfClass:[NEFilterSocketFlow class]]) {
-        return [NEFilterNewFlowVerdict allowVerdict];
-    }
-
     // 标记所有流都要数据
-    return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:YES peekInboundBytes:1024 filterOutbound:NO peekOutboundBytes:0];
+    return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:YES peekInboundBytes:512 filterOutbound:YES peekOutboundBytes:1024];
 
 }
 
@@ -165,7 +160,22 @@
 
     FirewallRule* matchedRule = nil;
     port = remoteEP.port;
-    
+    BOOL isIPv4 = NO;
+    if (remoteHostName.length > 0) {
+        struct in_addr addr;
+        if (inet_pton(AF_INET, [remoteHostName UTF8String], &addr) == 1) {
+            isIPv4 = YES;
+        }
+    }
+    if(isIPv4){
+        NSString* domainName = [[DomainIPCache sharedCache] domainForIP:remoteHostName];
+        if(domainName){
+            os_log(firewallLog , "the %{public}@ is a ipv4 addresss and hostName is %{public}@" , remoteHostName , domainName);
+        }else{
+            os_log(firewallLog, "the %{public}@ has no domain in cache" , remoteHostName);
+        }
+    }
+    if(ipv4StringToUInt32(remoteHostName))
     //分情况讨论：TCP和UDP和其他
     if(IPPROTO_TCP == socketFlow.socketProtocol){
         os_log(firewallLog ,"---- %{public}@ isTCPFlow----",flow.identifier);
@@ -187,10 +197,7 @@
                 return [NEFilterDataVerdict dropVerdict];
             }
         }
-    }else{
-        os_log(firewallLog ,"---- %{public}@  is not socket Flow ----" , flow.identifier);
     }
-    
     return [NEFilterDataVerdict allowVerdict];
 }
 
@@ -248,8 +255,15 @@
         if ([self isDNSResponseWithData:readBytes]) {
             os_log(firewallLog, "---socketFlow[%{public}@] is a DNS RESPONSE---", flow.identifier);
             
-            // ✅ 可在此处解析 DNS Response 获取域名 ↔ IP 映射
-            [self parseDNSResponse:readBytes forFlow:flow];
+            // 异步解析 DNS，不阻塞当前线程
+            NSData *dnsDataCopy = [readBytes copy]; // 防止原 data 被释放
+            dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+                @autoreleasepool {
+                    [self parseDNSResponse:dnsDataCopy forFlow:flow];
+                }
+            });
+            
+            return [NEFilterDataVerdict allowVerdict];
             // 注意：DNS 响应通常应放行，除非你要做 DNS 劫持/过滤
             return [NEFilterDataVerdict allowVerdict];
         } else {
