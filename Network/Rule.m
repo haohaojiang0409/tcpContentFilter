@@ -265,6 +265,7 @@
             }
             // 🔽 按 level 降序插入（高优先级在前）
             NSInteger insertIndex = [self indexOfInsertionForRule:rule inSortedArray:group];
+            NSLog(@"insertIndex : %ld , level of rule : %ld", (long)insertIndex , (long)rule.level);
             [group insertObject:rule atIndex:insertIndex];
         }
     });

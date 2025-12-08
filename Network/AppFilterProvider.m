@@ -16,9 +16,44 @@
     
     // 1️⃣ 初始化规则管理器（单例已自动创建）
     FirewallRuleManager *rulesManager = [FirewallRuleManager sharedManager];
-    // 2️⃣ 加载并注册 JSON 规则（内部会清空旧规则）
-    [self loadAndRegisterFirewallRules];
 
+    // 2️⃣ 初始化规则加载器
+    NSURL* ruleURL = [NSURL URLWithString:@"https://sp.pre.eagleyun.cn/api/agent/v1/edr/firewall_policy/get_firewall_detail_config"];
+    RulePollingManager *ruleManager = [[RulePollingManager alloc] initWithURL:ruleURL];
+    
+    ruleManager.onJSONReceived = ^(NSDictionary<NSString *, id> * _Nonnull json) {
+        // 注意：json 已经是解析好的 NSDictionary，无需再用 NSJSONSerialization 解析！
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (!json || json.count == 0) {
+                os_log(firewallLog , "Failed to read rule.json or file is empty");
+                return;
+            }
+            
+            NSDictionary *dataDict = json[@"data"];
+            NSArray *rawRules = dataDict[@"rules"];
+            
+            if (![rawRules isKindOfClass:[NSArray class]] || rawRules.count == 0) {
+                os_log(firewallLog , "No rules in 'data.rules'");
+                return;
+            }
+            
+            FirewallRuleManager *manager = [FirewallRuleManager sharedManager];
+            [manager removeAllRules]; // 清空前一次规则
+            
+            NSUInteger total = 0;
+            for (NSDictionary *rawRule in rawRules) {
+                NSArray<FirewallRule *> *rules = [FirewallRule rulesWithDictionary:rawRule];
+                for (FirewallRule *rule in rules) {
+                    [manager addRule:rule];
+                    total++;
+                }
+            }
+            
+            os_log(firewallLog , "Loaded and registered %lu firewall rule objects", (unsigned long)total);
+        });
+    };
+    // 开始轮询
+    [ruleManager startPolling];
     // 4️⃣ 初始化日志变量
     firewallLog = os_log_create("com.eagleyun.BorderControl", "Network");
     os_log(firewallLog , "Filter started");
@@ -62,51 +97,6 @@
     
 }
 
-#pragma mark - 加载json文件的逻辑
-
-- (void)loadAndRegisterFirewallRules {
-    NSString *jsonPath = [[NSBundle bundleForClass:[self class]] pathForResource:@"rule" ofType:@"json"];
-    if (!jsonPath) {
-        NSLog(@"rule.json not found in extension bundle. Check Target Membership!");
-        return;
-    }
-    
-    NSData *jsonData = [NSData dataWithContentsOfFile:jsonPath];
-    if (!jsonData || jsonData.length == 0) {
-        NSLog(@"Failed to read rule.json or file is empty");
-        return;
-    }
-    
-    NSError *error = nil;
-    id jsonObject = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:&error];
-    if (!jsonObject || ![jsonObject isKindOfClass:[NSDictionary class]]) {
-        NSLog(@"Invalid JSON root: %@", error.localizedDescription);
-        return;
-    }
-    
-    NSDictionary *dataDict = jsonObject[@"data"];
-    NSArray *rawRules = dataDict[@"rules"];
-    if (![rawRules isKindOfClass:[NSArray class]] || rawRules.count == 0) {
-        NSLog(@"No rules in 'data.rules'");
-        return;
-    }
-    
-    FirewallRuleManager *manager = [FirewallRuleManager sharedManager];
-    [manager removeAllRules]; // 清空前一次规则
-    
-    NSUInteger total = 0;
-    for (NSDictionary *rawRule in rawRules) {
-        NSArray<FirewallRule *> *rules = [FirewallRule rulesWithDictionary:rawRule];
-        for (FirewallRule *rule in rules) {
-            [manager addRule:rule];
-            total++;
-        }
-    }
-    
-    NSLog(@"Loaded and registered %lu firewall rule objects", (unsigned long)total);
-    
-}
-
 #pragma mark - 处理新到来的流
 //1.建立连接之前还是之后：建立连接之前
 //2.扩展截获的是发往所有网卡的数据包？可以选，默认所有网卡
@@ -117,9 +107,9 @@
         return [NEFilterNewFlowVerdict allowVerdict];
     }
     
+    return [NEFilterNewFlowVerdict allowVerdict];
     // 标记所有流都要数据
-    return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:YES peekInboundBytes:512 filterOutbound:YES peekOutboundBytes:1024];
-
+    //return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:YES peekInboundBytes:512 filterOutbound:YES peekOutboundBytes:1024];
 }
 
 #pragma mark -- 处理出站的所有流
@@ -262,9 +252,6 @@
                     [self parseDNSResponse:dnsDataCopy forFlow:flow];
                 }
             });
-            
-            return [NEFilterDataVerdict allowVerdict];
-            // 注意：DNS 响应通常应放行，除非你要做 DNS 劫持/过滤
             return [NEFilterDataVerdict allowVerdict];
         } else {
             os_log(firewallLog, "---socketFlow[%{public}@] is a UDP flow---", flow.identifier);

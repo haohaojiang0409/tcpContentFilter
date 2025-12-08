@@ -129,6 +129,7 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
 
 + (instancetype _Nonnull )sharedManager;
 
+
 /// 添加一条规则（自动按 direction + protocol 分组）
 - (void)addRule:(FirewallRule *_Nonnull)rule;
 
@@ -141,12 +142,6 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
 
 /// 获取所有规则（用于 UI 展示、导出等）
 - (NSArray<FirewallRule *> *_Nonnull)allRules;
-
-//- (FirewallRule *_Nullable)firstMatchedRuleForHostname:(NSString *_Nonnull)hostname
-//                                              remotePort:(NSInteger)remotePort
-//                                               localPort:(NSInteger)localPort
-//                                                protocol:(TransportProtocol)protocol
-//                                             direction:(FlowDirection)direction;
 
 - (BOOL)hostName:(NSString *_Nonnull)host matchesPattern:(NSString *_Nonnull)pattern;
 

@@ -3,17 +3,14 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 70;
+	objectVersion = 55;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		44405ACF2ED97E9500FD2DD1 /* tools.m in Sources */ = {isa = PBXBuildFile; fileRef = 44405ACE2ED97E9500FD2DD1 /* tools.m */; };
 		446A00C92EDD77EA00844427 /* XPCServer.m in Sources */ = {isa = PBXBuildFile; fileRef = 446A00C82EDD77E400844427 /* XPCServer.m */; };
-		446A00CF2EDDAE4B00844427 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63938C692A38BD1200734619 /* NetworkExtension.framework */; };
-		446A00DA2EDDAE4B00844427 /* com.eagleyun.BorderControl.DNSProxy.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = 446A00CE2EDDAE4B00844427 /* com.eagleyun.BorderControl.DNSProxy.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		446E1E632EE6A95A00C8A7B9 /* RulePollingManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 446E1E622EE6A95900C8A7B9 /* RulePollingManager.m */; };
 		44766DE02ED0099A00814D30 /* Rule.m in Sources */ = {isa = PBXBuildFile; fileRef = 44766DDF2ED0099800814D30 /* Rule.m */; };
-		44B09B362ED5D0F700CF0082 /* rule.json in Resources */ = {isa = PBXBuildFile; fileRef = 44B09B352ED5D0F700CF0082 /* rule.json */; };
-		44B09B372ED5D0F700CF0082 /* rule.json in Resources */ = {isa = PBXBuildFile; fileRef = 44B09B352ED5D0F700CF0082 /* rule.json */; };
 		44F6A8142EE192BC0073BD27 /* log.m in Sources */ = {isa = PBXBuildFile; fileRef = 44F6A8132EE192BB0073BD27 /* log.m */; };
 		44F6A8172EE2BA6A0073BD27 /* DomainIPCache.m in Sources */ = {isa = PBXBuildFile; fileRef = 44F6A8162EE2BA680073BD27 /* DomainIPCache.m */; };
 		63938C572A38BCD600734619 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 63938C562A38BCD600734619 /* AppDelegate.m */; };
@@ -30,13 +27,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		446A00D82EDDAE4B00844427 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 63938C4A2A38BCD600734619 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 446A00CD2EDDAE4B00844427;
-			remoteInfo = DNSProxy;
-		};
 		63938C792A38BD2C00734619 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 63938C4A2A38BCD600734619 /* Project object */;
@@ -63,7 +53,6 @@
 			dstPath = "$(SYSTEM_EXTENSIONS_FOLDER_PATH)";
 			dstSubfolderSpec = 16;
 			files = (
-				446A00DA2EDDAE4B00844427 /* com.eagleyun.BorderControl.DNSProxy.systemextension in Embed System Extensions */,
 				63938C7B2A38BD2C00734619 /* com.eagleyun.BorderControl.Network.systemextension in Embed System Extensions */,
 			);
 			name = "Embed System Extensions";
@@ -96,10 +85,10 @@
 		44405ACE2ED97E9500FD2DD1 /* tools.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = tools.m; sourceTree = "<group>"; };
 		446A00C72EDD77D500844427 /* XPCServer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = XPCServer.h; sourceTree = "<group>"; };
 		446A00C82EDD77E400844427 /* XPCServer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = XPCServer.m; sourceTree = "<group>"; };
-		446A00CE2EDDAE4B00844427 /* com.eagleyun.BorderControl.DNSProxy.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = com.eagleyun.BorderControl.DNSProxy.systemextension; sourceTree = BUILT_PRODUCTS_DIR; };
+		446E1E612EE6A94700C8A7B9 /* RulePollingManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RulePollingManager.h; sourceTree = "<group>"; };
+		446E1E622EE6A95900C8A7B9 /* RulePollingManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RulePollingManager.m; sourceTree = "<group>"; };
 		44766DDE2ED0099200814D30 /* Rule.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Rule.h; sourceTree = "<group>"; };
 		44766DDF2ED0099800814D30 /* Rule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Rule.m; sourceTree = "<group>"; };
-		44B09B352ED5D0F700CF0082 /* rule.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = rule.json; sourceTree = "<group>"; };
 		44F6A8122EE192A90073BD27 /* log.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = log.h; sourceTree = "<group>"; };
 		44F6A8132EE192BB0073BD27 /* log.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = log.m; sourceTree = "<group>"; };
 		44F6A8152EE2BA590073BD27 /* DomainIPCache.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DomainIPCache.h; sourceTree = "<group>"; };
@@ -126,29 +115,7 @@
 		63938C852A38BE4D00734619 /* NetworkExtension.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NetworkExtension.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		446A00DB2EDDAE4B00844427 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = 446A00CD2EDDAE4B00844427 /* DNSProxy */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
-/* Begin PBXFileSystemSynchronizedRootGroup section */
-		446A00D02EDDAE4B00844427 /* DNSProxy */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (446A00DB2EDDAE4B00844427 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = DNSProxy; sourceTree = "<group>"; };
-/* End PBXFileSystemSynchronizedRootGroup section */
-
 /* Begin PBXFrameworksBuildPhase section */
-		446A00CB2EDDAE4B00844427 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				446A00CF2EDDAE4B00844427 /* NetworkExtension.framework in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		63938C4F2A38BCD600734619 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -173,7 +140,6 @@
 			children = (
 				63938C542A38BCD600734619 /* BorderControl */,
 				63938C712A38BD2C00734619 /* Network */,
-				446A00D02EDDAE4B00844427 /* DNSProxy */,
 				63938C532A38BCD600734619 /* Products */,
 				63938C682A38BD1200734619 /* Frameworks */,
 			);
@@ -184,7 +150,6 @@
 			children = (
 				63938C522A38BCD600734619 /* BorderControl.app */,
 				63938C6F2A38BD2C00734619 /* com.eagleyun.BorderControl.Network.systemextension */,
-				446A00CE2EDDAE4B00844427 /* com.eagleyun.BorderControl.DNSProxy.systemextension */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -194,7 +159,6 @@
 			children = (
 				6378C62F2A47F1A400E1D2C4 /* Info.plist */,
 				63938C552A38BCD600734619 /* AppDelegate.h */,
-				44B09B352ED5D0F700CF0082 /* rule.json */,
 				63938C562A38BCD600734619 /* AppDelegate.m */,
 				63938C582A38BCD600734619 /* ViewController.h */,
 				63938C592A38BCD600734619 /* ViewController.m */,
@@ -220,6 +184,8 @@
 		63938C712A38BD2C00734619 /* Network */ = {
 			isa = PBXGroup;
 			children = (
+				446E1E612EE6A94700C8A7B9 /* RulePollingManager.h */,
+				446E1E622EE6A95900C8A7B9 /* RulePollingManager.m */,
 				44F6A8152EE2BA590073BD27 /* DomainIPCache.h */,
 				44F6A8162EE2BA680073BD27 /* DomainIPCache.m */,
 				44F6A8122EE192A90073BD27 /* log.h */,
@@ -242,28 +208,6 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		446A00CD2EDDAE4B00844427 /* DNSProxy */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 446A00DC2EDDAE4B00844427 /* Build configuration list for PBXNativeTarget "DNSProxy" */;
-			buildPhases = (
-				446A00CA2EDDAE4B00844427 /* Sources */,
-				446A00CB2EDDAE4B00844427 /* Frameworks */,
-				446A00CC2EDDAE4B00844427 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				446A00D02EDDAE4B00844427 /* DNSProxy */,
-			);
-			name = DNSProxy;
-			packageProductDependencies = (
-			);
-			productName = DNSProxy;
-			productReference = 446A00CE2EDDAE4B00844427 /* com.eagleyun.BorderControl.DNSProxy.systemextension */;
-			productType = "com.apple.product-type.system-extension";
-		};
 		63938C512A38BCD600734619 /* BorderControl */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 63938C652A38BCD800734619 /* Build configuration list for PBXNativeTarget "BorderControl" */;
@@ -279,7 +223,6 @@
 			);
 			dependencies = (
 				63938C7A2A38BD2C00734619 /* PBXTargetDependency */,
-				446A00D92EDDAE4B00844427 /* PBXTargetDependency */,
 			);
 			name = BorderControl;
 			productName = BorderControl;
@@ -313,9 +256,6 @@
 				BuildIndependentTargetsInParallel = 1;
 				LastUpgradeCheck = 1320;
 				TargetAttributes = {
-					446A00CD2EDDAE4B00844427 = {
-						CreatedOnToolsVersion = 26.1.1;
-					};
 					63938C512A38BCD600734619 = {
 						CreatedOnToolsVersion = 13.2.1;
 					};
@@ -339,24 +279,15 @@
 			targets = (
 				63938C512A38BCD600734619 /* BorderControl */,
 				63938C6E2A38BD2C00734619 /* Network */,
-				446A00CD2EDDAE4B00844427 /* DNSProxy */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		446A00CC2EDDAE4B00844427 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		63938C502A38BCD600734619 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				44B09B362ED5D0F700CF0082 /* rule.json in Resources */,
 				63938C5C2A38BCD800734619 /* Assets.xcassets in Resources */,
 				63938C5F2A38BCD800734619 /* Main.storyboard in Resources */,
 			);
@@ -366,20 +297,12 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				44B09B372ED5D0F700CF0082 /* rule.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		446A00CA2EDDAE4B00844427 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		63938C4E2A38BCD600734619 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -402,17 +325,13 @@
 				63938C742A38BD2C00734619 /* AppFilterProvider.m in Sources */,
 				44405ACF2ED97E9500FD2DD1 /* tools.m in Sources */,
 				44F6A8172EE2BA6A0073BD27 /* DomainIPCache.m in Sources */,
+				446E1E632EE6A95A00C8A7B9 /* RulePollingManager.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		446A00D92EDDAE4B00844427 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 446A00CD2EDDAE4B00844427 /* DNSProxy */;
-			targetProxy = 446A00D82EDDAE4B00844427 /* PBXContainerItemProxy */;
-		};
 		63938C7A2A38BD2C00734619 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 63938C6E2A38BD2C00734619 /* Network */;
@@ -432,76 +351,6 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
-		446A00DD2EDDAE4B00844427 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-				CODE_SIGN_ENTITLEMENTS = DNSProxy/DNSProxy.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 585Z2747F9;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = DNSProxy/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = DNSProxy;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-					"@executable_path/../../../../Frameworks",
-				);
-				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.1;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.eagleyun.BorderControl.DNSProxy;
-				PRODUCT_NAME = "$(inherited)";
-				REGISTER_APP_GROUPS = YES;
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-			};
-			name = Debug;
-		};
-		446A00DE2EDDAE4B00844427 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-				CODE_SIGN_ENTITLEMENTS = DNSProxy/DNSProxy.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 585Z2747F9;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = DNSProxy/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = DNSProxy;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-					"@executable_path/../../../../Frameworks",
-				);
-				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.1;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.eagleyun.BorderControl.DNSProxy;
-				PRODUCT_NAME = "$(inherited)";
-				REGISTER_APP_GROUPS = YES;
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-			};
-			name = Release;
-		};
 		63938C632A38BCD800734619 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -728,15 +577,6 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		446A00DC2EDDAE4B00844427 /* Build configuration list for PBXNativeTarget "DNSProxy" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				446A00DD2EDDAE4B00844427 /* Debug */,
-				446A00DE2EDDAE4B00844427 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		63938C4D2A38BCD600734619 /* Build configuration list for PBXProject "BorderControl" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
