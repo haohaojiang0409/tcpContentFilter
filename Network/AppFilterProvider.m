@@ -14,16 +14,15 @@
 #pragma mark - 加载过滤配置
 - (void)startFilterWithCompletionHandler:(void (^)(NSError * _Nullable))completionHandler {
     
-    // 1️⃣ 初始化规则管理器（单例已自动创建）
+    // 1️⃣ 初始化规则管理器
     FirewallRuleManager *rulesManager = [FirewallRuleManager sharedManager];
 
     // 2️⃣ 初始化规则加载器
     NSURL* ruleURL = [NSURL URLWithString:@"https://sp.pre.eagleyun.cn/api/agent/v1/edr/firewall_policy/get_firewall_detail_config"];
-    RulePollingManager *ruleManager = [[RulePollingManager alloc] initWithURL:ruleURL];
+    RulePollingManager* _rulePollingManager = [[RulePollingManager alloc] initWithURL:ruleURL];
     
-    ruleManager.onJSONReceived = ^(NSDictionary<NSString *, id> * _Nonnull json) {
+    _rulePollingManager.onJSONReceived = ^(NSDictionary<NSString *, id> * _Nonnull json) {
         // 注意：json 已经是解析好的 NSDictionary，无需再用 NSJSONSerialization 解析！
-        dispatch_async(dispatch_get_main_queue(), ^{
             if (!json || json.count == 0) {
                 os_log(firewallLog , "Failed to read rule.json or file is empty");
                 return;
@@ -50,10 +49,9 @@
             }
             
             os_log(firewallLog , "Loaded and registered %lu firewall rule objects", (unsigned long)total);
-        });
     };
     // 开始轮询
-    [ruleManager startPolling];
+    [_rulePollingManager startPolling];
     // 4️⃣ 初始化日志变量
     firewallLog = os_log_create("com.eagleyun.BorderControl", "Network");
     os_log(firewallLog , "Filter started");

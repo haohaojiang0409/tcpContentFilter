@@ -17,10 +17,13 @@
 -(instancetype _Nonnull )initWithURL:(NSURL * _Nonnull)url{
     if(self = [super init]){
         _url = url;
-        //配置session
+        //配置默认session
         NSURLSessionConfiguration* config = [NSURLSessionConfiguration defaultSessionConfiguration];
+        //强制忽略本地缓存
         config.requestCachePolicy = NSURLRequestReloadIgnoringCacheData;
+        //单次请求的超时时间
         config.timeoutIntervalForRequest = 15.0;
+        //整个资源的总加载时间
         config.timeoutIntervalForResource = 30.0;
         _session = [NSURLSession sessionWithConfiguration:config];
     }
@@ -35,6 +38,7 @@
 - (void)stopPolling {
 
 }
+
 
 - (void)fetchJson {
     // 1. 构建URL http get请求
@@ -60,7 +64,11 @@
             NSLog(@"[RulePolling] Request failed: %@", error);
             return;
         }
-
+        NSHTTPURLResponse* httpResponse = (NSHTTPURLResponse*)response;
+        if(200 != httpResponse.statusCode){
+            NSLog(@"[RulePolling] HTTP Error : %ld" , (long)httpResponse.statusCode);
+            return;
+        }
         // 3. 解析 JSON
         NSError *jsonError = nil;
         NSDictionary *jsonDict =
