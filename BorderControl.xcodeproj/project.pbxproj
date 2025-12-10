@@ -8,10 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		44405ACF2ED97E9500FD2DD1 /* tools.m in Sources */ = {isa = PBXBuildFile; fileRef = 44405ACE2ED97E9500FD2DD1 /* tools.m */; };
-		446A00C92EDD77EA00844427 /* XPCServer.m in Sources */ = {isa = PBXBuildFile; fileRef = 446A00C82EDD77E400844427 /* XPCServer.m */; };
 		446E1E632EE6A95A00C8A7B9 /* RulePollingManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 446E1E622EE6A95900C8A7B9 /* RulePollingManager.m */; };
 		44766DE02ED0099A00814D30 /* Rule.m in Sources */ = {isa = PBXBuildFile; fileRef = 44766DDF2ED0099800814D30 /* Rule.m */; };
-		44F6A8142EE192BC0073BD27 /* log.m in Sources */ = {isa = PBXBuildFile; fileRef = 44F6A8132EE192BB0073BD27 /* log.m */; };
+		44C04C852EE81A5300D3BD42 /* Process.m in Sources */ = {isa = PBXBuildFile; fileRef = 44C04C842EE81A5200D3BD42 /* Process.m */; };
+		44C04C892EE9546C00D3BD42 /* libbsm.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 44C04C882EE9544300D3BD42 /* libbsm.tbd */; };
 		44F6A8172EE2BA6A0073BD27 /* DomainIPCache.m in Sources */ = {isa = PBXBuildFile; fileRef = 44F6A8162EE2BA680073BD27 /* DomainIPCache.m */; };
 		63938C572A38BCD600734619 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 63938C562A38BCD600734619 /* AppDelegate.m */; };
 		63938C5A2A38BCD600734619 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 63938C592A38BCD600734619 /* ViewController.m */; };
@@ -83,14 +83,13 @@
 /* Begin PBXFileReference section */
 		44405ACD2ED97E7F00FD2DD1 /* tools.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = tools.h; sourceTree = "<group>"; };
 		44405ACE2ED97E9500FD2DD1 /* tools.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = tools.m; sourceTree = "<group>"; };
-		446A00C72EDD77D500844427 /* XPCServer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = XPCServer.h; sourceTree = "<group>"; };
-		446A00C82EDD77E400844427 /* XPCServer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = XPCServer.m; sourceTree = "<group>"; };
 		446E1E612EE6A94700C8A7B9 /* RulePollingManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RulePollingManager.h; sourceTree = "<group>"; };
 		446E1E622EE6A95900C8A7B9 /* RulePollingManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RulePollingManager.m; sourceTree = "<group>"; };
 		44766DDE2ED0099200814D30 /* Rule.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Rule.h; sourceTree = "<group>"; };
 		44766DDF2ED0099800814D30 /* Rule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Rule.m; sourceTree = "<group>"; };
-		44F6A8122EE192A90073BD27 /* log.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = log.h; sourceTree = "<group>"; };
-		44F6A8132EE192BB0073BD27 /* log.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = log.m; sourceTree = "<group>"; };
+		44C04C832EE81A4B00D3BD42 /* Process.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Process.h; sourceTree = "<group>"; };
+		44C04C842EE81A5200D3BD42 /* Process.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Process.m; sourceTree = "<group>"; };
+		44C04C882EE9544300D3BD42 /* libbsm.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libbsm.tbd; path = usr/lib/libbsm.tbd; sourceTree = SDKROOT; };
 		44F6A8152EE2BA590073BD27 /* DomainIPCache.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DomainIPCache.h; sourceTree = "<group>"; };
 		44F6A8162EE2BA680073BD27 /* DomainIPCache.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DomainIPCache.m; sourceTree = "<group>"; };
 		6378C61A2A47B85100E1D2C4 /* libEndpointSecurity.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libEndpointSecurity.tbd; path = usr/lib/libEndpointSecurity.tbd; sourceTree = SDKROOT; };
@@ -129,6 +128,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				63938C702A38BD2C00734619 /* NetworkExtension.framework in Frameworks */,
+				44C04C892EE9546C00D3BD42 /* libbsm.tbd in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -175,6 +175,7 @@
 		63938C682A38BD1200734619 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				44C04C882EE9544300D3BD42 /* libbsm.tbd */,
 				63938C692A38BD1200734619 /* NetworkExtension.framework */,
 				6378C61A2A47B85100E1D2C4 /* libEndpointSecurity.tbd */,
 			);
@@ -184,14 +185,12 @@
 		63938C712A38BD2C00734619 /* Network */ = {
 			isa = PBXGroup;
 			children = (
+				44C04C832EE81A4B00D3BD42 /* Process.h */,
+				44C04C842EE81A5200D3BD42 /* Process.m */,
 				446E1E612EE6A94700C8A7B9 /* RulePollingManager.h */,
 				446E1E622EE6A95900C8A7B9 /* RulePollingManager.m */,
 				44F6A8152EE2BA590073BD27 /* DomainIPCache.h */,
 				44F6A8162EE2BA680073BD27 /* DomainIPCache.m */,
-				44F6A8122EE192A90073BD27 /* log.h */,
-				44F6A8132EE192BB0073BD27 /* log.m */,
-				446A00C72EDD77D500844427 /* XPCServer.h */,
-				446A00C82EDD77E400844427 /* XPCServer.m */,
 				44405ACD2ED97E7F00FD2DD1 /* tools.h */,
 				44405ACE2ED97E9500FD2DD1 /* tools.m */,
 				63938C722A38BD2C00734619 /* AppFilterProvider.h */,
@@ -318,8 +317,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				44F6A8142EE192BC0073BD27 /* log.m in Sources */,
-				446A00C92EDD77EA00844427 /* XPCServer.m in Sources */,
+				44C04C852EE81A5300D3BD42 /* Process.m in Sources */,
 				44766DE02ED0099A00814D30 /* Rule.m in Sources */,
 				63938C762A38BD2C00734619 /* main.m in Sources */,
 				63938C742A38BD2C00734619 /* AppFilterProvider.m in Sources */,

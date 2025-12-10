@@ -10,8 +10,11 @@
 
 @interface RulePollingManager : NSObject
 
+@property (nonatomic, strong) dispatch_source_t _Nullable timer;
+
 @property (nonatomic, strong) NSURL * _Nullable url;
-@property (nonatomic, copy) NSString * _Nullable authToken;  
+
+@property (nonatomic, copy) NSString * _Nullable authToken;
 //每隔多少时间间隔拉取一次
 -(instancetype _Nonnull )initWithURL:(NSURL * _Nonnull)url;
 

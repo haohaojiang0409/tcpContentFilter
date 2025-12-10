@@ -9,6 +9,7 @@
 // ✅ 类扩展：声明私有属性（包括 authToken）
 @interface RulePollingManager ()
 @property (nonatomic, strong) NSURLSession *session;
+
 @end
 
 @implementation RulePollingManager
@@ -26,6 +27,8 @@
         //整个资源的总加载时间
         config.timeoutIntervalForResource = 30.0;
         _session = [NSURLSession sessionWithConfiguration:config];
+        
+        
     }
     return self;
 }
@@ -33,10 +36,31 @@
 - (void)startPolling {
     //拉取一次json
     [self fetchJson];
+    // 创建 GCD Timer
+    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0);
+    self.timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
+
+    // 设置为每隔 10 分钟触发一次
+    uint64_t interval = 600ull * NSEC_PER_SEC;
+
+    dispatch_source_set_timer(self.timer,
+                              dispatch_time(DISPATCH_TIME_NOW, interval),
+                              interval,
+                              5ull * NSEC_PER_SEC);  // 允许 5 秒误差
+
+    __weak typeof(self) weakSelf = self;
+    dispatch_source_set_event_handler(self.timer, ^{
+        [weakSelf fetchJson];
+    });
+
+    dispatch_resume(self.timer);
 }
 
 - (void)stopPolling {
-
+    if (self.timer) {
+        dispatch_source_cancel(self.timer);
+        self.timer = nil;
+    }
 }
 
 
@@ -55,12 +79,12 @@
 
     
     NSURLSessionDataTask *task =
-    [[NSURLSession sharedSession] dataTaskWithRequest:request
+    [self.session dataTaskWithRequest:request
                                     completionHandler:^(NSData *data,
                                                         NSURLResponse *response,
                                                         NSError *error) {
 
-        if (error) {
+        if (error || !data ) {
             NSLog(@"[RulePolling] Request failed: %@", error);
             return;
         }
@@ -85,9 +109,7 @@
 
         // 4. 调用回调
         if (self.onJSONReceived) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                self.onJSONReceived(jsonDict);
-            });
+            self.onJSONReceived(jsonDict);
         }
     }];
 

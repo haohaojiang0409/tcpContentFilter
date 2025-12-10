@@ -9,7 +9,9 @@
 #include <sys/time.h>
 #import <Network/Network.h>
 #include <arpa/inet.h>
-
+@interface AppFilterProvider()
+@property (nonatomic, strong) RulePollingManager *rulePollingManager;
+@end
 @implementation AppFilterProvider
 #pragma mark - 加载过滤配置
 - (void)startFilterWithCompletionHandler:(void (^)(NSError * _Nullable))completionHandler {
@@ -17,11 +19,11 @@
     // 1️⃣ 初始化规则管理器
     FirewallRuleManager *rulesManager = [FirewallRuleManager sharedManager];
 
-    // 2️⃣ 初始化规则加载器
+    // 2️⃣ 初始化规则轮询加载器
     NSURL* ruleURL = [NSURL URLWithString:@"https://sp.pre.eagleyun.cn/api/agent/v1/edr/firewall_policy/get_firewall_detail_config"];
-    RulePollingManager* _rulePollingManager = [[RulePollingManager alloc] initWithURL:ruleURL];
+    self.rulePollingManager = [[RulePollingManager alloc] initWithURL:ruleURL];
     
-    _rulePollingManager.onJSONReceived = ^(NSDictionary<NSString *, id> * _Nonnull json) {
+    self.rulePollingManager.onJSONReceived = ^(NSDictionary<NSString *, id> * _Nonnull json) {
         // 注意：json 已经是解析好的 NSDictionary，无需再用 NSJSONSerialization 解析！
             if (!json || json.count == 0) {
                 os_log(firewallLog , "Failed to read rule.json or file is empty");
@@ -51,7 +53,7 @@
             os_log(firewallLog , "Loaded and registered %lu firewall rule objects", (unsigned long)total);
     };
     // 开始轮询
-    [_rulePollingManager startPolling];
+    [self.rulePollingManager startPolling];
     // 4️⃣ 初始化日志变量
     firewallLog = os_log_create("com.eagleyun.BorderControl", "Network");
     os_log(firewallLog , "Filter started");
@@ -88,6 +90,11 @@
 
 - (void)stopFilterWithReason:(NEProviderStopReason)reason completionHandler:(void (^)(void))completionHandler {
     NSLog(@"Packet filter stopped: %ld", (long)reason);
+    if (self.rulePollingManager) {
+        [self.rulePollingManager stopPolling];
+        self.rulePollingManager = nil;
+    }
+
     completionHandler();
 }
 
@@ -105,9 +112,8 @@
         return [NEFilterNewFlowVerdict allowVerdict];
     }
     
-    return [NEFilterNewFlowVerdict allowVerdict];
     // 标记所有流都要数据
-    //return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:YES peekInboundBytes:512 filterOutbound:YES peekOutboundBytes:1024];
+    return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:NO peekInboundBytes:0 filterOutbound:YES peekOutboundBytes:1024];
 }
 
 #pragma mark -- 处理出站的所有流
@@ -145,7 +151,8 @@
         remoteHostName = remoteEP.hostname;
         os_log(firewallLog ,"---- %{public}@ remoteEP hostname:%{public}@is not nil"  , flow.identifier , remoteHostName);
     }
-
+    
+    
     FirewallRule* matchedRule = nil;
     port = remoteEP.port;
     BOOL isIPv4 = NO;
@@ -163,7 +170,11 @@
             os_log(firewallLog, "the %{public}@ has no domain in cache" , remoteHostName);
         }
     }
-    if(ipv4StringToUInt32(remoteHostName))
+    
+    //获取进程信息
+    NSData* processData = flow.sourceProcessAuditToken;
+    Process* process = [[Process alloc] initWithFlowMetadata:flow.sourceProcessAuditToken];
+    
     //分情况讨论：TCP和UDP和其他
     if(IPPROTO_TCP == socketFlow.socketProtocol){
         os_log(firewallLog ,"---- %{public}@ isTCPFlow----",flow.identifier);
@@ -171,6 +182,7 @@
         if(matchedRule && matchedRule.allow == NO){
             //有对应规则且规则中为阻塞，就把这个流过滤掉
             os_log(firewallLog, "==== firewallRule is matched : %{public}@ ",remoteHostName);
+            
             return [NEFilterDataVerdict dropVerdict];
         }
     }else if(IPPROTO_UDP == socketFlow.socketProtocol){

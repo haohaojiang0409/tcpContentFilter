@@ -9,14 +9,9 @@
 #import <NetworkExtension/NetworkExtension.h>
 #import "Rule.h"
 #import "tools.h"
-#import "XPCServer.h"
-#import "log.h"
 #import "DomainIPCache.h"
 #import "RulePollingManager.h"
-//@interface AppFilterProvider : NEFilterDataProvider
-//
-//+ (void)initialize;
-//@end
+#import "Process.h"
 
 static os_log_t _Nonnull firewallLog;
 
