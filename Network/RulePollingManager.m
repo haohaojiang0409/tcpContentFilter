@@ -10,6 +10,14 @@
 @interface RulePollingManager ()
 @property (nonatomic, strong) NSURLSession *session;
 
+// 信号量用于同步等待
+@property (nonatomic, strong) dispatch_semaphore_t loadSemaphore;
+
+// 标记是否为首次加载
+@property (nonatomic, assign) BOOL isInitialLoad;
+
+// 保存最后一次加载错误
+@property (nonatomic, strong) NSError *lastLoadError;
 @end
 
 @implementation RulePollingManager
@@ -28,7 +36,9 @@
         config.timeoutIntervalForResource = 30.0;
         _session = [NSURLSession sessionWithConfiguration:config];
         
-        
+        //初始化信号量
+        _loadSemaphore = dispatch_semaphore_create(0);
+        _isInitialLoad = YES;
     }
     return self;
 }
@@ -63,6 +73,26 @@
     }
 }
 
+-(NSError *)waitForInitialLoadWithTimeout:(NSTimeInterval)timeout {
+    if(!_isInitialLoad){
+        return nil;
+    }
+    
+    // 等待信号量
+    dispatch_time_t waitTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(timeout * NSEC_PER_SEC));
+    long result = dispatch_semaphore_wait(self.loadSemaphore, waitTime);
+    
+    if (result == 0) {
+        // 成功等待到信号量
+        _isInitialLoad = NO; // 标记首次加载已完成
+        return self.lastLoadError; // 返回加载错误（如果有的话）
+    } else {
+        // 超时
+        return [NSError errorWithDomain:@"RulePollingError"
+                                 code:-1
+                             userInfo:@{NSLocalizedDescriptionKey:@"Initial rule load timeout"}];
+    }
+}
 
 - (void)fetchJson {
     // 1. 构建URL http get请求
@@ -83,34 +113,45 @@
                                     completionHandler:^(NSData *data,
                                                         NSURLResponse *response,
                                                         NSError *error) {
-
+        NSError* loadError = nil;
         if (error || !data ) {
             NSLog(@"[RulePolling] Request failed: %@", error);
-            return;
-        }
-        NSHTTPURLResponse* httpResponse = (NSHTTPURLResponse*)response;
-        if(200 != httpResponse.statusCode){
-            NSLog(@"[RulePolling] HTTP Error : %ld" , (long)httpResponse.statusCode);
-            return;
-        }
-        // 3. 解析 JSON
-        NSError *jsonError = nil;
-        NSDictionary *jsonDict =
-            [NSJSONSerialization JSONObjectWithData:data
-                                            options:NSJSONReadingMutableContainers
-                                              error:&jsonError];
+            loadError = error ?: [NSError errorWithDomain:@"RulePollingError"
+               code:-2
+           userInfo:@{NSLocalizedDescriptionKey:@"No data received"}];
+        }else {
+            NSHTTPURLResponse* httpResponse = (NSHTTPURLResponse*)response;
+            if(200 != httpResponse.statusCode){
+                NSLog(@"[RulePolling] HTTP Error : %ld" , (long)httpResponse.statusCode);
+                loadError = [NSError errorWithDomain:@"RulePollingError"
+                                                             code:httpResponse.statusCode
+                                                         userInfo:@{NSLocalizedDescriptionKey:[NSString stringWithFormat:@"HTTP Error %ld", (long)httpResponse.statusCode]}];
+            }else{
+                // 3. 解析 JSON
+                NSError *jsonError = nil;
+                NSDictionary *jsonDict =
+                    [NSJSONSerialization JSONObjectWithData:data
+                                                    options:NSJSONReadingMutableContainers
+                                                      error:&jsonError];
 
-        if (jsonError || ![jsonDict isKindOfClass:[NSDictionary class]]) {
-            NSLog(@"[RulePolling] JSON parse failed: %@", jsonError);
-            return;
-        }
+                if (jsonError || ![jsonDict isKindOfClass:[NSDictionary class]]) {
+                    NSLog(@"[RulePolling] JSON parse failed: %@", jsonError);
+                    loadError = jsonError ?: [NSError errorWithDomain:@"RulePollingError"
+                          code:-3
+                         userInfo:@{NSLocalizedDescriptionKey:@"Invalid JSON format"}];
+                }else{
+                    NSLog(@"[RulePolling] JSON received: %@", jsonDict);
 
-        NSLog(@"[RulePolling] JSON received: %@", jsonDict);
-
-        // 4. 调用回调
-        if (self.onJSONReceived) {
-            self.onJSONReceived(jsonDict);
+                    // 4. 调用回调
+                    if (self.onJSONReceived) {
+                        self.onJSONReceived(jsonDict);
+                    }
+                }
+            }
         }
+        self.lastLoadError = loadError;
+        
+        dispatch_semaphore_signal(self.loadSemaphore);
     }];
 
     //发送请求

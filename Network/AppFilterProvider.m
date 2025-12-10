@@ -23,37 +23,64 @@
     NSURL* ruleURL = [NSURL URLWithString:@"https://sp.pre.eagleyun.cn/api/agent/v1/edr/firewall_policy/get_firewall_detail_config"];
     self.rulePollingManager = [[RulePollingManager alloc] initWithURL:ruleURL];
     
+    //创建信号量用于同步等待
+    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+    __block NSError* loadError = nil;
+    
     self.rulePollingManager.onJSONReceived = ^(NSDictionary<NSString *, id> * _Nonnull json) {
         // 注意：json 已经是解析好的 NSDictionary，无需再用 NSJSONSerialization 解析！
             if (!json || json.count == 0) {
+                loadError = [NSError errorWithDomain:@"RuleLoadError" code:-1 userInfo:@{NSLocalizedDescriptionKey:@"Rules JSON is empty"}];
                 os_log(firewallLog , "Failed to read rule.json or file is empty");
                 return;
-            }
-            
-            NSDictionary *dataDict = json[@"data"];
-            NSArray *rawRules = dataDict[@"rules"];
-            
-            if (![rawRules isKindOfClass:[NSArray class]] || rawRules.count == 0) {
-                os_log(firewallLog , "No rules in 'data.rules'");
-                return;
-            }
-            
-            FirewallRuleManager *manager = [FirewallRuleManager sharedManager];
-            [manager removeAllRules]; // 清空前一次规则
-            
-            NSUInteger total = 0;
-            for (NSDictionary *rawRule in rawRules) {
-                NSArray<FirewallRule *> *rules = [FirewallRule rulesWithDictionary:rawRule];
-                for (FirewallRule *rule in rules) {
-                    [manager addRule:rule];
-                    total++;
+            }else {
+                NSDictionary *dataDict = json[@"data"];
+                NSArray *rawRules = dataDict[@"rules"];
+                
+                if (![rawRules isKindOfClass:[NSArray class]] || rawRules.count == 0) {
+                    loadError = [NSError errorWithDomain:@"RuleLoadError" code:-2 userInfo:@{NSLocalizedDescriptionKey:@"No rules in 'data.rules'"}];
+                    os_log(firewallLog , "No rules in 'data.rules'");
+                    return;
+                }else{
+                    FirewallRuleManager *manager = [FirewallRuleManager sharedManager];
+                    [manager removeAllRules]; // 清空前一次规则
+                    
+                    NSUInteger total = 0;
+                    for (NSDictionary *rawRule in rawRules) {
+                        NSArray<FirewallRule *> *rules = [FirewallRule rulesWithDictionary:rawRule];
+                        for (FirewallRule *rule in rules) {
+                            [manager addRule:rule];
+                            total++;
+                        }
+                    }
+                    os_log(firewallLog , "Loaded and registered %lu firewall rule objects", (unsigned long)total);
                 }
             }
-            
-            os_log(firewallLog , "Loaded and registered %lu firewall rule objects", (unsigned long)total);
+        dispatch_semaphore_signal(semaphore);
     };
     // 开始轮询
     [self.rulePollingManager startPolling];
+// ✅ 5️⃣ 同步等待首次规则加载完成（最多等待 10 秒）
+    loadError = [self.rulePollingManager waitForInitialLoadWithTimeout:10.0];
+    
+    if (loadError) {
+        os_log_error(firewallLog, "Failed to load initial rules from network: %{public}@", loadError.localizedDescription);
+        
+        // ❗️ 尝试加载本地缓存规则
+        [self tryLoadCachedRules];
+        
+        os_log(firewallLog, "Starting with cached rules due to network error");
+    } else {
+        os_log(firewallLog, "Initial rules loaded successfully from network");
+    }
+    //启动超时定时器
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW ,(int64_t)(10.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        dispatch_semaphore_signal(semaphore);
+    });
+    
+    //同步等待规则加载完成
+    dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+    
     // 4️⃣ 初始化日志变量
     firewallLog = os_log_create("com.eagleyun.BorderControl", "Network");
     os_log(firewallLog , "Filter started");
@@ -426,6 +453,59 @@
         offset += 1 + len;
     }
     return NSNotFound;
+}
+
+#pragma mark - 加载本地规则兜底
+- (void)tryLoadCachedRules {
+    // 构建本地规则文件路径
+    NSString *bundlePath = [[NSBundle bundleForClass:[AppFilterProvider class]] pathForResource:@"rule" ofType:@"json"];
+    if (!bundlePath) {
+        os_log(firewallLog, "Local rule.json not found in bundle");
+        return;
+    }
+    
+    os_log(firewallLog, "Loading cached rules from: %@", bundlePath);
+    
+    // 读取 JSON 文件
+    NSData *jsonData = [NSData dataWithContentsOfFile:bundlePath];
+    if (!jsonData) {
+        os_log_error(firewallLog, "Failed to read local rule.json file");
+        return;
+    }
+    
+    // 解析 JSON
+    NSError *jsonError = nil;
+    NSDictionary *jsonDict = [NSJSONSerialization JSONObjectWithData:jsonData
+                                                             options:0
+                                                               error:&jsonError];
+    if (jsonError || ![jsonDict isKindOfClass:[NSDictionary class]]) {
+        os_log_error(firewallLog, "Failed to parse local rule.json: %{public}@", jsonError.localizedDescription);
+        return;
+    }
+    
+    // 解析并加载规则（与网络加载逻辑相同）
+    NSDictionary *dataDict = jsonDict[@"data"];
+    NSArray *rawRules = dataDict[@"rules"];
+    
+    if (![rawRules isKindOfClass:[NSArray class]] || rawRules.count == 0) {
+        os_log(firewallLog, "No rules in local rule.json 'data.rules'");
+        return;
+    }
+    
+    // 获取规则管理器并加载规则
+    FirewallRuleManager *rulesManager = [FirewallRuleManager sharedManager];
+    [rulesManager removeAllRules]; // 清空现有规则
+    
+    NSUInteger total = 0;
+    for (NSDictionary *rawRule in rawRules) {
+        NSArray<FirewallRule *> *rules = [FirewallRule rulesWithDictionary:rawRule];
+        for (FirewallRule *rule in rules) {
+            [rulesManager addRule:rule];
+            total++;
+        }
+    }
+    
+    os_log(firewallLog, "Loaded %lu rules from local cache", (unsigned long)total);
 }
 @end
 
