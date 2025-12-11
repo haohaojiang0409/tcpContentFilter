@@ -12,14 +12,16 @@
 #import <Security/Security.h>
 
 #import <bsm/libbsm.h>
+#import "const.h"
 
+#import "log.h"
 NS_ASSUME_NONNULL_BEGIN
 typedef struct {
     pid_t pid;
     char name[64];
     uint8_t sha256[32];
     BOOL hasSha256;
-    char processPath[512];
+    char processPath[PROC_PIDPATHINFO_MAXSIZE];
 }ProcessCoreData;
 
 

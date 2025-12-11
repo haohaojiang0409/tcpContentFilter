@@ -25,26 +25,38 @@
     if (self = [super init]) {
         // 1. 从 metadata 提取 audit token
         if (metadata.length != 32) {
-            NSLog(@"Invalid audit token size");
+            [[Logger sharedLogger] error:@"Invalid audit token size"];
             return self;
         }
-        
         audit_token_t auditToken;
         memcpy(&auditToken, metadata.bytes, 32);
         _coreData.pid = audit_token_to_pid(auditToken);
         
         // 2. 获取基础信息（可能失败）
         proc_name(_coreData.pid, _coreData.name, sizeof(_coreData.name));
-        proc_pidpath(_coreData.pid, _coreData.processPath, sizeof(_coreData.processPath));
+        
+        int err = proc_pidpath(_coreData.pid, _coreData.processPath, sizeof(_coreData.processPath));
+        if (err > 0) {
+            // 成功：result 是字节数，pathBuffer 已 null-terminated
+            [[Logger sharedLogger] info: @"%@", [NSString stringWithUTF8String: _coreData.processPath]];
+        } else if (err == 0) {
+            [[Logger sharedLogger] error: @"proc_pidpath failed: buffer too small or invalid PID"];
+            // 实际上 PROC_PIDPATHINFO_MAXSIZE 应该足够大，所以更可能是无效 PID
+        } else if (err == -1) {
+            [[Logger sharedLogger] error:@"proc_pidpath error for PID %d: %s (errno=%d)" , (int)_coreData.pid, strerror(errno), errno];
+        }
         
         _sha256HashStr = [self sha256HashForFilePath:_coreData.processPath];
         
-        NSString* str = [NSString stringWithUTF8String:_coreData.processPath];
-        _infoPlist = [self codeSignatureInfoForExecutableAtPath:str];
-        
+        if(strlen(_coreData.processPath) != 0){
+            NSString* str = [NSString stringWithUTF8String:_coreData.processPath];
+            _infoPlist = [self codeSignatureInfoForExecutableAtPath:str];
+        }else{
+            [[Logger sharedLogger] warning:@"[initWithFlowMetadata] _sha256HashStr is null"];
+
+        }
         // 3. Bundle ID 需要从签名或系统接口获取，不能用 mainBundle！
-        // （mainBundle 是你自己的 Extension，不是目标进程！）
-        // 暂时留空，后续从签名中提取
+        
     }
     //打印日志
     [self logAllProperties];
@@ -54,7 +66,7 @@
 #pragma mark -- 进程文件哈希值
 - (NSString *)sha256HashForFilePath:(const char *)filePath {
     if (!filePath || strlen(filePath) == 0) {
-        NSLog(@"file Path is null");
+        [[Logger sharedLogger] error:@"[sha256HashForFilePath] file Path is null"];
         return nil;
     }
     
@@ -66,6 +78,7 @@
 #pragma mark -- 计算NSData的哈希值
 - (NSString *)sha256HashForData:(NSData *)data {
     if (!data) {
+        [[Logger sharedLogger] error : @"[sha256HashForData] data is nil"];
         return nil;
     }
     
@@ -89,7 +102,7 @@
     OSStatus status = SecStaticCodeCreateWithPath(url, kSecCSDefaultFlags, &staticCode);
     
     if(status != errSecSuccess){
-        NSLog(@"SecStaticCodeCreateWithPath failed : %ld" , (long)status);
+        [[Logger sharedLogger] error:@"SecStaticCodeCreateWithPath failed : %ld" , (long)status ];
         return nil;
     }
     //2.获取签名信息
@@ -105,33 +118,34 @@
 
 #pragma mark -- 日志打印
 - (void)logAllProperties {
-    NSLog(@"=== Process Info ===");
+    Logger *logger = [Logger sharedLogger];
     
     // 基础信息
-    NSLog(@"Bundle Identifier: %@", self.bundleIdentifier ?: @"(null)");
-    NSLog(@"Process ID (PID): %d", (int)self.coreData.pid);
-    NSLog(@"Process Name: %s", self.coreData.name ? :"(null)");
+    [logger info:@"=== Process Info ==="];
+    [logger info:@"Bundle Identifier: %@", self.bundleIdentifier ?: @"(null)"];
+    [logger info:@"Process ID (PID): %d", (int)self.coreData.pid];
+    [logger info:@"Process Name: %s", self.coreData.name ?: "(null)"];
     
     // 路径信息
-    NSLog(@"Executable Path: %s", self.coreData.processPath ?: "(null)");
+    [logger info:@"Executable Path: %s", self.coreData.processPath ?: "(null)"];
     
     // 安全属性
-    NSLog(@"SHA-256 Hash: %@", self.sha256HashStr ?: @"(null)");
-    NSLog(@"Code Signature Summary:");
+    [logger info:@"SHA-256 Hash: %@", self.sha256HashStr ?: @"(null)"];
+    [logger info:@"Code Signature Summary:"];
     
     if (self.sha256HashStr) {
-        NSLog(@"  - Raw Signature: %@", self.sha256HashStr);
+        [logger debug:@"  - Raw Signature: %@", self.sha256HashStr];
     } else {
-        NSLog(@"  - (No signature info)");
+        [logger warning:@"  - (No signature info)"];
     }
     
     // Info.plist 内容（简略）
     if (self.infoPlist && [self.infoPlist count] > 0) {
-        NSLog(@"Info.plist Keys: %@", [self.infoPlist allKeys]);
+        [logger info:@"Info.plist Keys: %@ values : %@", [self.infoPlist allKeys] ,[self.infoPlist allValues]];
     } else {
-        NSLog(@"Info.plist: (null or empty)");
+        [logger warning:@"Info.plist: (null or empty)"];
     }
     
-    NSLog(@"====================\n");
+    [logger info:@"====================\n"];
 }
 @end

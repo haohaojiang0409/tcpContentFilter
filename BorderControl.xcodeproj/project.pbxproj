@@ -13,6 +13,7 @@
 		44C04C852EE81A5300D3BD42 /* Process.m in Sources */ = {isa = PBXBuildFile; fileRef = 44C04C842EE81A5200D3BD42 /* Process.m */; };
 		44C04C892EE9546C00D3BD42 /* libbsm.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 44C04C882EE9544300D3BD42 /* libbsm.tbd */; };
 		44C04C8B2EE9772000D3BD42 /* rule.json in Resources */ = {isa = PBXBuildFile; fileRef = 44C04C8A2EE9772000D3BD42 /* rule.json */; };
+		44C04C8E2EEA62F400D3BD42 /* log.m in Sources */ = {isa = PBXBuildFile; fileRef = 44C04C8D2EEA62F400D3BD42 /* log.m */; };
 		44F6A8172EE2BA6A0073BD27 /* DomainIPCache.m in Sources */ = {isa = PBXBuildFile; fileRef = 44F6A8162EE2BA680073BD27 /* DomainIPCache.m */; };
 		63938C572A38BCD600734619 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 63938C562A38BCD600734619 /* AppDelegate.m */; };
 		63938C5A2A38BCD600734619 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 63938C592A38BCD600734619 /* ViewController.m */; };
@@ -92,6 +93,9 @@
 		44C04C842EE81A5200D3BD42 /* Process.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Process.m; sourceTree = "<group>"; };
 		44C04C882EE9544300D3BD42 /* libbsm.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libbsm.tbd; path = usr/lib/libbsm.tbd; sourceTree = SDKROOT; };
 		44C04C8A2EE9772000D3BD42 /* rule.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = rule.json; sourceTree = "<group>"; };
+		44C04C8C2EEA62F400D3BD42 /* log.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = log.h; sourceTree = "<group>"; };
+		44C04C8D2EEA62F400D3BD42 /* log.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = log.m; sourceTree = "<group>"; };
+		44C04C8F2EEA995B00D3BD42 /* const.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = const.h; sourceTree = "<group>"; };
 		44F6A8152EE2BA590073BD27 /* DomainIPCache.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DomainIPCache.h; sourceTree = "<group>"; };
 		44F6A8162EE2BA680073BD27 /* DomainIPCache.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DomainIPCache.m; sourceTree = "<group>"; };
 		6378C61A2A47B85100E1D2C4 /* libEndpointSecurity.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libEndpointSecurity.tbd; path = usr/lib/libEndpointSecurity.tbd; sourceTree = SDKROOT; };
@@ -188,6 +192,9 @@
 		63938C712A38BD2C00734619 /* Network */ = {
 			isa = PBXGroup;
 			children = (
+				44C04C8F2EEA995B00D3BD42 /* const.h */,
+				44C04C8C2EEA62F400D3BD42 /* log.h */,
+				44C04C8D2EEA62F400D3BD42 /* log.m */,
 				44C04C832EE81A4B00D3BD42 /* Process.h */,
 				44C04C842EE81A5200D3BD42 /* Process.m */,
 				446E1E612EE6A94700C8A7B9 /* RulePollingManager.h */,
@@ -323,6 +330,7 @@
 			files = (
 				44C04C852EE81A5300D3BD42 /* Process.m in Sources */,
 				44766DE02ED0099A00814D30 /* Rule.m in Sources */,
+				44C04C8E2EEA62F400D3BD42 /* log.m in Sources */,
 				63938C762A38BD2C00734619 /* main.m in Sources */,
 				63938C742A38BD2C00734619 /* AppFilterProvider.m in Sources */,
 				44405ACF2ED97E9500FD2DD1 /* tools.m in Sources */,
@@ -475,7 +483,18 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 585Z2747F9;
+				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BorderControl/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -504,7 +523,18 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 585Z2747F9;
+				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BorderControl/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -529,7 +559,18 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 585Z2747F9;
+				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Network/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Network;
@@ -556,7 +597,18 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 585Z2747F9;
+				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Network/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Network;
