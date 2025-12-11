@@ -16,6 +16,8 @@
 
 #import "log.h"
 NS_ASSUME_NONNULL_BEGIN
+
+//进程元数据
 typedef struct {
     pid_t pid;
     char name[64];
@@ -27,10 +29,10 @@ typedef struct {
 
 @interface Process : NSObject
 
-// 从 NEAppProxyFlowMetadata 初始化
+// 从原始流提取数据解析
 - (instancetype)initWithFlowMetadata:(NSData *)metadata;
 
-// 基础信息（来自 metadata，无需额外权限）
+// 基础信息
 @property (nonatomic, readonly, nullable) NSString *bundleIdentifier; // CFBundleIdentifier
 
 // 派生信息（需文件访问，可能为 nil，受沙盒限制）
@@ -43,6 +45,8 @@ typedef struct {
 @property (nonatomic , copy)NSString* sha256HashStr; // 可执行文件 SHA256
 
 - (void)logAllProperties;
+
+-(ProcessCoreData)getCoreData;
 @end
 
 NS_ASSUME_NONNULL_END

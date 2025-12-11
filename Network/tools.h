@@ -10,10 +10,14 @@
 #import <Foundation/Foundation.h>
 #import <netdb.h>
 #import <arpa/inet.h>
+#include <CommonCrypto/CommonDigest.h>
+
 //反向解析ip地址
 NSArray* resolveAddress(NSString* ipAddr);
 
 uint32_t strToIpv4Uint16(NSString* strHostName);
 
 uint32_t ipv4StringToUInt32(NSString *ipStr);
+
+NSString *SHA256DataToHexString(const uint8_t digest[CC_SHA256_DIGEST_LENGTH]);
 #endif

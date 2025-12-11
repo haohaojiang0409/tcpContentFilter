@@ -50,35 +50,30 @@
 
 - (instancetype)init {
     // 提供一个安全的默认初始化（虽然通常应使用指定初始化器）
-    return [self initWithDirection:FlowDirectionOutbound
+    return [self initWithDirection:0
                           protocol:@[]
                        fiveTuples:@[]
-                      processName:nil
-                      processPath:nil
-                    developerName:nil
-                            allow:YES];
+                            allow:YES
+                      processRules:@[]];
 }
-
+// 初始化完整规则
 - (instancetype)initWithDirection:(FlowDirection)direction
                          protocol:(NSArray<NSNumber *> *)protocolTypes // 建议参数名与属性一致
-                     fiveTuples:(NSArray<fiveINetTuple *> *)fiveTuples
-                    processName:(nullable NSString *)processName
-                    processPath:(nullable NSString *)processPath
-                  developerName:(nullable NSString *)developerName
-                          allow:(BOOL)allow {
+                       fiveTuples:(NSArray<fiveINetTuple *> *)fiveTuples
+                            allow:(BOOL)allow
+                     processRules:(NSArray<ProcessRule*>* _Nullable) processRules {
     if (self = [super init]) {
         _direction = direction;
         _protocolTypes = [protocolTypes copy]; // 强制 copy
         _fiveTuples = [fiveTuples copy];
-        _processName = processName;
-        _processPath = processPath;
-        _developerName = developerName;
         _allow = allow;
+        _processArr = [processRules copy];
     }
     return self;
 }
 
 + (NSArray<FirewallRule *> *)rulesWithDictionary:(NSDictionary *)dict {
+    [[Logger sharedLogger] info:@"[rulesWithDictionary] is started!"];
     // 1. 解析 direction
     NSString *dirStr = dict[@"direction"];
     if (![dirStr isEqualToString:@"out"] && ![dirStr isEqualToString:@"in"]) {
@@ -191,15 +186,38 @@
         NSLog(@"[RULE PARSE] ⚠️ Rule has no valid tuples (policy: %@)", policyName);
     }
 
+    //加载进程的相关规则
+    
+    NSMutableArray<ProcessRule *> * processArr = [NSMutableArray alloc] ;
+    NSArray *processStrs = dict[@"processes"];
+    
+    for (NSDictionary *ruleDict in processStrs) {
+        ProcessRule *rule = [[ProcessRule alloc] init];
+        
+        // 必填或常用字段
+        rule.processName        = ruleDict[@"process_name"] ?: @"";
+        rule.hash256            = ruleDict[@"hash256"] ?: @"";
+        rule.path               = ruleDict[@"path"] ?: @"";
+        
+        // 可选字段
+        rule.company            = ruleDict[@"company"] ?: @"";
+        rule.processDescription = ruleDict[@"process_des"] ?: @"";
+        rule.originFilename     = ruleDict[@"origin_filename"] ?: @"";
+        rule.productDescription = ruleDict[@"product_des"] ?: @"";
+        rule.signer = ruleDict[@"signer"] ?: @"";
+        
+        [processArr addObject:rule];
+    }
+
+    // 所有解析后的 ProcessRule 对象数量
+    [[Logger sharedLogger] info:@"[RuleManager] Parsed %lu rules" , (unsigned long)processArr.count];
     // 6. 创建规则
     FirewallRule *rule = [[FirewallRule alloc]
-        initWithDirection:direction
-                 protocol:protocolTypes
-             fiveTuples:tuples
-            processName:nil
-            processPath:nil
-          developerName:nil
-                  allow:allow];
+                        initWithDirection:direction
+                                 protocol:protocolTypes
+                               fiveTuples:tuples
+                                    allow:allow
+                             processRules:processArr];
 
     // 7. 设置元数据
     rule.policyName = policyName;
@@ -210,6 +228,8 @@
     rule.localizedSuggestion = dict[@"chinese"][@"suggestion"];
     return @[rule];
 }
+
+
 
 @end
 ///规则管理类
@@ -324,7 +344,8 @@
 ///出站判断函数，出站可匹配ip地址，可匹配域名
 -(FirewallRule*)firstMatchedRuleForOutBound:(NSString*)_remoteHostName
                                  remotePort:(NSString*)_remotePort
-                                   protocol:(NSString*)_Protocol{
+                                   protocol:(NSString*)_Protocol
+                                    process:(ProcessRule*)_processrule{
     // 1. 获取该 direction + protocol 下的所有规则
     NSArray<FirewallRule *> *candidateRules = [self rulesForDirection:FlowDirectionOutbound protocol:_Protocol];
     if (candidateRules.count == 0) {
@@ -360,17 +381,15 @@
             }else {
                 // IPv4 匹配
                 uint32_t remoteIp = ipv4StringToUInt32(_remoteHostName);
-                if (tuple.ipStart == 0 && tuple.ipEnd == 0) {
+                if ((tuple.ipStart == 0 && tuple.ipEnd == 0) ||( remoteIp >= tuple.ipStart && remoteIp <= tuple.ipEnd)) {
                     // 规则未指定 IP 范围 → 匹配任意 IP
-                    isMatched = YES;
-                    //NSLog(@"IP wildcard (0.0.0.0-0.0.0.0) matched for %@", _remoteHostName);
-                    break;
-                }else if (remoteIp >= tuple.ipStart && remoteIp <= tuple.ipEnd) {
-                    isMatched = YES;
-                    //NSLog(@"IP range matched: %@ in [%u, %u]", _remoteHostName, tuple.ipStart, tuple.ipEnd);
-                    break;
+                    [[Logger sharedLogger] info:@"[RuleManager OutBound ip has matched a rule]"];
+                    //TODO : 匹配进程
+                    isMatched = [self matchesProcess:_processrule rules:candidateRules];
+                    if(isMatched)
+                        break;
                 }else{
-                    //NSLog(@"IP %@ NOT in range [%u, %u]", _remoteHostName, tuple.ipStart, tuple.ipEnd);
+                    [[Logger sharedLogger] info:@ "[RuleManager] OutBound has not matched a rule ipstart:%u ipend : %u" , tuple.ipStart , tuple.ipEnd];
                 }
             }
         }
@@ -378,21 +397,23 @@
             return rule;
         }
     }
-    NSLog(@"---don't have any matched rule---");
+    [[Logger sharedLogger] info: @"---don't have any matched rule --- "];
     return nil;
 }
 
 //入站匹配函数
 -(FirewallRule*_Nonnull)firstMatchedRuleForInBound:(NSString*_Nonnull)_remoteIP
                                         localPort:(NSString*_Nonnull)_localPort
-                                          protocol:(NSString*_Nonnull)_Protocol{
+                                          protocol:(NSString*_Nonnull)_Protocol
+                                           process:(ProcessRule*)_processrule{
     // 1. 获取该 direction + protocol 下的所有规则
     NSArray<FirewallRule *> *candidateRules = [self rulesForDirection:FlowDirectionInbound protocol:_Protocol];
     if (candidateRules.count == 0) {
-        NSLog(@"firstMatchedRuleForHostname : candidataeRules is nil");
+        //NSLog(@"firstMatchedRuleForHostname : candidataeRules is nil");
+        [[Logger sharedLogger] error:@"firstMatchedRuleForHostname : candidataeRules is nil"];
         return nil;
     }else{
-        NSLog(@"the number of rules is : %lu",(unsigned long)candidateRules.count);
+        [[Logger sharedLogger] info:@"the number of rules is : %lu" , (unsigned long)candidateRules.count];
     }
     ///判断是否是IPV4地址
     BOOL isIPv4 = NO;
@@ -407,40 +428,28 @@
         BOOL isMatched = NO;
         // 3.入站：检查每个 fiveTuple 的 hostName 和 remotePort 是否在范围内
         for (fiveINetTuple *tuple in rule.fiveTuples) {
-            // 本地端口匹配：remotePort ∈ [portStart, portEnd]
-//            NSLog(@"tuplestart : %hu , tupleend : %hu , tupleipstart : %u , tupleipend : %u",tuple.portStart , tuple.portEnd , tuple.ipStart , tuple.ipEnd);
             NSUInteger Port = [_localPort integerValue];
-//            NSLog(@"local port :%lu , tuplestart : %hu , tupleend : %hu",(unsigned long)Port , tuple.portStart , tuple.portEnd);
             if (Port < tuple.portStart || Port > tuple.portEnd) {
-//                NSLog(@"port is not in range");
                 continue;
             }
             // ip匹配（支持 nil 表示任意）
             if(isIPv4){
                 // IPv4 匹配
                 uint32_t remoteIp = ipv4StringToUInt32(_remoteIP);
-                //如果ip为0.0.0.0那么匹配所有ip
-                if(tuple.ipStart == 0 && tuple.ipEnd == 0){
-                    isMatched = YES;
-                    //NSLog(@"IP wildcard (0.0.0.0-0.0.0.0) matched for %@", _remoteIP);
-                    break;
-                }else if(remoteIp >= tuple.ipStart && remoteIp <= tuple.ipEnd){
-                    isMatched = YES;
-                    //NSLog(@"IP range matched: %@ in [%u, %u]", _remoteIP, tuple.ipStart, tuple.ipEnd);
-                    break;
-                }else{
-                    //NSLog(@"IP %@ NOT in range [%u, %u]", _remoteIP, tuple.ipStart, tuple.ipEnd);
-                    break;
+                if((tuple.ipStart == 0 && tuple.ipEnd == 0) || (remoteIp >= tuple.ipStart && remoteIp <= tuple.ipEnd)){
+                    //TODO : 匹配进程
+                    isMatched = [self matchesProcess:_processrule rules:candidateRules];
+                    if(isMatched)
+                        break;
                 }
             }else{
-                NSLog(@"ip is not IPV4 address");
+               [[Logger sharedLogger] info :@"ip is not IPV4 address"];
             }
         }
         if(isMatched){
             return rule;
         }
     }
-//    NSLog(@"---don't have any matched rule---");
     return nil;
 }
 
@@ -470,4 +479,109 @@
     return NO;
 }
 
+#pragma mark -- 是否匹配规则中设定的某个进程
+- (BOOL)matchesProcess:(ProcessRule *)processInfo  rules:(NSArray<FirewallRule *> *)candidateRules{
+    for (ProcessRule *rule in candidateRules) {
+        if ([rule matchesProcess:processInfo]) {
+            [[Logger sharedLogger] info:@"[RuleManager] is matched a process rule"];
+            return YES; // 命中一条即匹配
+        }
+    }
+    return NO;
+}
+
 @end
+
+#pragma mark - 进程规则类
+@implementation ProcessRule
+
++ (BOOL)supportsSecureCoding {
+    return YES;
+}
+
+- (void)encodeWithCoder:(nonnull NSCoder *)coder {
+    [coder encodeObject:self.processName forKey:@"processName"];
+    [coder encodeObject:self.company forKey:@"company"];
+    [coder encodeObject:self.hash256 forKey:@"hash256"];
+    [coder encodeObject:self.processDescription forKey:@"processDescription"];
+    [coder encodeObject:self.originFilename forKey:@"originFilename"];
+    [coder encodeObject:self.productDescription forKey:@"productDescription"];
+    [coder encodeObject:self.path forKey:@"path"];
+    [coder encodeObject:self.signer forKey:@"signer"];
+}
+
+- (nullable instancetype)initWithCoder:(nonnull NSCoder *)coder {
+    if (self = [super init]) {
+            _processName = [coder decodeObjectOfClass:[NSString class] forKey:@"processName"];
+            _company = [coder decodeObjectOfClass:[NSString class] forKey:@"company"];
+            _hash256 = [coder decodeObjectOfClass:[NSString class] forKey:@"hash256"];
+            _processDescription = [coder decodeObjectOfClass:[NSString class] forKey:@"processDes"];
+            _originFilename = [coder decodeObjectOfClass:[NSString class] forKey:@"originFilename"];
+            _productDescription = [coder decodeObjectOfClass:[NSString class] forKey:@"productDes"];
+            _path = [coder decodeObjectOfClass:[NSString class] forKey:@"path"];
+            _signer = [coder decodeObjectOfClass:[NSString class] forKey:@"signer"];
+        }
+        return self;
+}
+
+// 判断当前规则是否匹配给定的进程信息
+- (BOOL)matchesProcess:(ProcessRule *)processInfo {
+    if (!processInfo) return NO;
+
+    // 定义局部 block
+    BOOL (^matchField)(NSString *, NSString *) = ^BOOL(NSString *ruleValue, NSString *actualValue) {
+        if (ruleValue.length == 0) return YES; // 规则为空 → 不限制
+        if (!actualValue) return NO;
+        return [ruleValue isEqualToString:actualValue];
+    };
+
+    return matchField(self.processName, processInfo.processName)
+        && matchField(self.company, processInfo.company)
+        && matchField(self.hash256, processInfo.hash256)
+        && matchField(self.processDescription, processInfo.processDescription)
+        && matchField(self.originFilename, processInfo.originFilename)
+        && matchField(self.productDescription, processInfo.productDescription)
+        && matchField(self.path, processInfo.path)
+        && matchField(self.signer, processInfo.signer);
+}
+
+//C结构体转化为OC对象
++ (instancetype)ruleWithProcess:(Process *)process {
+    ProcessRule *rule = [[ProcessRule alloc] init];
+    
+    // 基础标识
+    rule.processName = [ NSString stringWithUTF8String:process.getCoreData.name];
+    
+    // SHA256
+    rule.hash256 = SHA256DataToHexString(process.getCoreData.sha256);
+    
+    // 路径
+    rule.path = [NSString stringWithUTF8String:process.getCoreData.processPath];
+    
+    // 从 Info.plist 提取
+    if (process.infoPlist) {
+        rule.originFilename = process.infoPlist[@"CFBundleExecutable"] ?: @"";
+        rule.processDescription = process.infoPlist[@"CFBundleName"] ?: @"";
+        rule.productDescription = [NSString stringWithFormat:@"%@ %@",
+                                   process.infoPlist[@"CFBundleIdentifier"] ?: @"",
+                                   process.infoPlist[@"CFBundleShortVersionString"] ?: @""];
+        
+        // 尝试获取公司
+        rule.company = process.infoPlist[@"NSHumanReadableCopyright"] ?:
+                       process.infoPlist[@"CFBundleDevelopmentRegion"] ?:
+                       @"";
+    }
+    
+    // 签名者（需额外实现，见下文）
+    rule.signer = [self extractSignerFromProcess:process];
+    
+    return rule;
+}
+
++ (NSString *)extractSignerFromProcess:(Process *)process {
+    // TODO: 从代码签名中提取 Team ID 或 Common Name
+    // 暂时返回空，后续可扩展
+    return @"";
+}
+@end
+

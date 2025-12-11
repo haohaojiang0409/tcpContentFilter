@@ -15,7 +15,8 @@
 @implementation AppFilterProvider
 #pragma mark - 加载过滤配置
 - (void)startFilterWithCompletionHandler:(void (^)(NSError * _Nullable))completionHandler {
-    
+    Logger * log = [Logger sharedLogger];
+    [log info:@"-------[startFilterWithCompletionHandler] is started------"];
     // 1️⃣ 初始化规则管理器
     FirewallRuleManager *rulesManager = [FirewallRuleManager sharedManager];
 
@@ -39,7 +40,7 @@
                 
                 if (![rawRules isKindOfClass:[NSArray class]] || rawRules.count == 0) {
                     loadError = [NSError errorWithDomain:@"RuleLoadError" code:-2 userInfo:@{NSLocalizedDescriptionKey:@"No rules in 'data.rules'"}];
-                    os_log(firewallLog , "No rules in 'data.rules'");
+                    [[Logger sharedLogger] info:@"No rules in 'data.rules'"];
                     return;
                 }else{
                     FirewallRuleManager *manager = [FirewallRuleManager sharedManager];
@@ -53,7 +54,7 @@
                             total++;
                         }
                     }
-                    os_log(firewallLog , "Loaded and registered %lu firewall rule objects", (unsigned long)total);
+                    [[Logger sharedLogger] info:@"Loaded and registered %lu firewall rule objects", (unsigned long)total];
                 }
             }
         dispatch_semaphore_signal(semaphore);
@@ -64,14 +65,14 @@
     loadError = [self.rulePollingManager waitForInitialLoadWithTimeout:10.0];
     
     if (loadError) {
-        os_log_error(firewallLog, "Failed to load initial rules from network: %{public}@", loadError.localizedDescription);
+        [[Logger sharedLogger] info:@"Failed to load initial rules from network: %@", loadError.localizedDescription];
         
         // ❗️ 尝试加载本地缓存规则
         [self tryLoadCachedRules];
         
-        os_log(firewallLog, "Starting with cached rules due to network error");
+        [[Logger sharedLogger] info:@"Starting with cached rules due to network error" ];
     } else {
-        os_log(firewallLog, "Initial rules loaded successfully from network");
+        [[Logger sharedLogger] info:@"Initial rules loaded successfully from network" ];
     }
     //启动超时定时器
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW ,(int64_t)(10.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -83,7 +84,7 @@
     
     // 4️⃣ 初始化日志变量
     firewallLog = os_log_create("com.eagleyun.BorderControl", "Network");
-    os_log(firewallLog , "Filter started");
+    [[Logger sharedLogger] info:@"Filter started"];
        NSFileManager *filemgr;
        // end pcap initialization
         NENetworkRule* networkRule = [
@@ -168,11 +169,11 @@
     //从URL获取主机名
     if(nil != socketFlow.URL.host){
         remoteHostName = socketFlow.URL.host;
-        os_log(firewallLog ,"---- %{public}@ socket URL host:%{public}@ is not nil" , flow.identifier , remoteHostName);
+//        os_log(firewallLog ,"---- %{public}@ socket URL host:%{public}@ is not nil" , flow.identifier , remoteHostName);
     }//从flow中获取主机名
     else if(nil != socketFlow.remoteHostname){
         remoteHostName = socketFlow.remoteHostname;
-        os_log(firewallLog ,"---- %{public}@ socket remoteHost Name:%{public}@ is not nil " , flow.identifier , remoteHostName);
+//        os_log(firewallLog ,"---- %{public}@ socket remoteHost Name:%{public}@ is not nil " , flow.identifier , remoteHostName);
     }//获取ip地址
     else if(nil != remoteEP.hostname){
         remoteHostName = remoteEP.hostname;
@@ -205,7 +206,7 @@
     //分情况讨论：TCP和UDP和其他
     if(IPPROTO_TCP == socketFlow.socketProtocol){
         os_log(firewallLog ,"---- %{public}@ isTCPFlow----",flow.identifier);
-         matchedRule = [manager firstMatchedRuleForOutBound:remoteHostName remotePort:port protocol:@"tcp"];
+        matchedRule = [manager firstMatchedRuleForOutBound:remoteHostName remotePort:port protocol:@"tcp" process:process];
         if(matchedRule && matchedRule.allow == NO){
             //有对应规则且规则中为阻塞，就把这个流过滤掉
             os_log(firewallLog, "==== firewallRule is matched : %{public}@ ",remoteHostName);
@@ -218,7 +219,7 @@
             os_log(firewallLog , "[ID : %{public}@ is DNS",flow.identifier);
         }else{
             os_log(firewallLog ,"---- %{public}@  isUDPFlow ----",flow.identifier);
-            matchedRule = [manager firstMatchedRuleForOutBound:remoteHostName remotePort:port protocol:@"udp"];
+            matchedRule = [manager firstMatchedRuleForOutBound:remoteHostName remotePort:port protocol:@"udp" process:process];
             if(matchedRule && matchedRule.allow == NO){
                 os_log(firewallLog, "==== firewallRule is matched : %{public}@ ",remoteHostName);
                 return [NEFilterDataVerdict dropVerdict];
@@ -273,10 +274,17 @@
     FirewallRuleManager *manager = [FirewallRuleManager sharedManager];
     
     FirewallRule * rule = nil;
+    
+    //获取进程信息
+    NSData* processData = flow.sourceProcessAuditToken;
+    //获取C结构体对象
+    Process* process = [[Process alloc] initWithFlowMetadata:flow.sourceProcessAuditToken];
+    //转化为rule对象
+    ProcessRule * _processRule = [ProcessRule ruleWithProcess:process];
     //4. 判断协议
     if(IPPROTO_TCP == socketFlow.socketProtocol){
         os_log(firewallLog , "---socketFlow[%{public}@] is a tcp flow---",flow.identifier);
-        rule = [manager firstMatchedRuleForInBound:remoteHostName localPort:port protocol:@"tcp"];
+        rule = [manager firstMatchedRuleForInBound:remoteHostName localPort:port protocol:@"tcp" process:_processRule];
     } else if (IPPROTO_UDP == socketFlow.socketProtocol) {
         // 入站 UDP：可能是 DNS 响应
         if ([self isDNSResponseWithData:readBytes]) {
@@ -292,7 +300,7 @@
             return [NEFilterDataVerdict allowVerdict];
         } else {
             os_log(firewallLog, "---socketFlow[%{public}@] is a UDP flow---", flow.identifier);
-            rule = [manager firstMatchedRuleForInBound:remoteHostName localPort:port protocol:@"udp"];
+            rule = [manager firstMatchedRuleForInBound:remoteHostName localPort:port protocol:@"udp" process:process];
         }
     }else{
         os_log(firewallLog , "===the flow[%{public}@] is not network flow===",flow.identifier);
@@ -392,7 +400,7 @@
         offset = nameEnd + 10 + rdlength;
     }
 }
-
+#pragma mark -- 解析DNS报文
 - (NSString *)parseDomainFromDNSAtOffset:(const uint8_t *)start data:(NSData *)data startOffset:(NSUInteger)startOffset {
     NSMutableString *domain = [NSMutableString string];
     const uint8_t *bytes = (const uint8_t *)[data bytes];
@@ -458,18 +466,18 @@
 #pragma mark - 加载本地规则兜底
 - (void)tryLoadCachedRules {
     // 构建本地规则文件路径
-    NSString *bundlePath = [[NSBundle bundleForClass:[AppFilterProvider class]] pathForResource:@"rule" ofType:@"json"];
+    NSString *bundlePath = [[NSBundle mainBundle] pathForResource:@"rule" ofType:@"json"];
     if (!bundlePath) {
-        os_log(firewallLog, "Local rule.json not found in bundle");
+        [[Logger sharedLogger] error:@"Local rule.json not found in bundle path: %@" , bundlePath];
         return;
     }
     
-    os_log(firewallLog, "Loading cached rules from: %@", bundlePath);
+    [[Logger sharedLogger] info:@"%@", [NSString stringWithFormat:@"Loading cached rules from: %@", bundlePath]];
     
     // 读取 JSON 文件
     NSData *jsonData = [NSData dataWithContentsOfFile:bundlePath];
     if (!jsonData) {
-        os_log_error(firewallLog, "Failed to read local rule.json file");
+        [[Logger sharedLogger] error:@"Failed to read local rule.json file"];
         return;
     }
     
@@ -479,7 +487,7 @@
                                                              options:0
                                                                error:&jsonError];
     if (jsonError || ![jsonDict isKindOfClass:[NSDictionary class]]) {
-        os_log_error(firewallLog, "Failed to parse local rule.json: %{public}@", jsonError.localizedDescription);
+        [[Logger sharedLogger] error:@"%@", [NSString stringWithFormat:@"Failed to parse local rule.json: %@", jsonError.localizedDescription]];
         return;
     }
     
@@ -488,7 +496,7 @@
     NSArray *rawRules = dataDict[@"rules"];
     
     if (![rawRules isKindOfClass:[NSArray class]] || rawRules.count == 0) {
-        os_log(firewallLog, "No rules in local rule.json 'data.rules'");
+        [[Logger sharedLogger] info:@"No rules in local rule.json 'data.rules'"];
         return;
     }
     
@@ -505,7 +513,7 @@
         }
     }
     
-    os_log(firewallLog, "Loaded %lu rules from local cache", (unsigned long)total);
+    [[Logger sharedLogger] info:@"%@", [NSString stringWithFormat:@"Loaded %lu rules from local cache", (unsigned long)total]];
 }
 @end
 

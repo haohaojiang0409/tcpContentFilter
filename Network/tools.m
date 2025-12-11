@@ -28,3 +28,12 @@ uint32_t ipv4StringToUInt32(NSString *ipStr) {
     }
     return 0;
 }
+
+#pragma mark - 将sha256转为字符串
+NSString *SHA256DataToHexString(const uint8_t digest[CC_SHA256_DIGEST_LENGTH]) {
+    NSMutableString *hex = [NSMutableString stringWithCapacity:64];
+    for (int i = 0; i < CC_SHA256_DIGEST_LENGTH; i++) {
+        [hex appendFormat:@"%02x", digest[i]];
+    }
+    return [hex copy];
+}

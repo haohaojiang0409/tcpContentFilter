@@ -10,6 +10,7 @@
 #import "tools.h"
 #import "log.h"
 #import "AppFilterProvider.h"
+#import "Process.h"
 
 // 方向
 typedef NS_ENUM(NSUInteger, FlowDirection) {
@@ -57,6 +58,26 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
 
 @end
 
+#pragma mark -- 进程规则类（暂时只支持精细匹配）
+@interface ProcessRule : NSObject <NSSecureCoding>
+
+@property (nonatomic, copy) NSString * _Nullable processName;      // 进程名
+@property (nonatomic, copy) NSString * _Nullable company;          // 公司名
+@property (nonatomic, copy) NSString * _Nullable hash256;          // SHA-256 哈希
+@property (nonatomic, copy) NSString * _Nullable processDescription;// 进程描述
+@property (nonatomic, copy) NSString * _Nullable originFilename;   // 原始文件名
+@property (nonatomic, copy) NSString * _Nullable productDescription;// 产品描述
+@property (nonatomic, copy) NSString * _Nullable path;             // 可执行路径
+@property (nonatomic, copy) NSString * _Nullable signer;           // 签名者
+
+// 判断当前规则是否匹配给定的进程信息
+- (BOOL)matchesProcess:(ProcessRule *_Nonnull)processInfo;
+
+// C结构和OC对象的相互转化
++ (instancetype _Nonnull )ruleWithProcess:(Process *_Nonnull)process;
+
+@end
+
 
 #pragma mark -- 防火墙单个规则类
 @interface FirewallRule : NSObject
@@ -69,17 +90,11 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
 
 @property (nonatomic, strong) NSArray<fiveINetTuple *> * _Nonnull fiveTuples;
 
-#pragma mark - 进程信息（仅用于出站匹配）
-/// 进程名（如 "Safari"），nil 表示不限制
-@property (nonatomic, copy, nullable) NSString *processName;
+#pragma mark - 进程信息
+//规则中包含的进程拦截
+@property (nonatomic , copy , nullable) NSArray<ProcessRule *> * processArr;
 
-/// 进程可执行路径（如 "/Applications/Safari.app/..."），nil 表示不限制
-@property (nonatomic, copy, nullable) NSString *processPath;
-
-/// 开发商（通过代码签名获取，如 "Apple Inc."），nil 表示不限制
-@property (nonatomic, copy, nullable) NSString *developerName;
-
-#pragma mark - 动作（可扩展）
+#pragma mark - 动作
 /// 是否允许通过（YES = 放行，NO = 拦截）
 @property (nonatomic, assign) BOOL allow;
 
@@ -102,16 +117,16 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
 
 /// 工厂方法：从 JSON 字典创建（可能返回多个规则）
 + (NSArray<FirewallRule *> *_Nonnull)rulesWithDictionary:(NSDictionary *_Nonnull)dict;
+
 /// 初始化完整规则
 - (instancetype _Nonnull )initWithDirection:(FlowDirection)direction
                                    protocol:(NSArray<NSNumber *> *_Nonnull)protocoltypes
-                       fiveTuples:(NSArray<fiveINetTuple *> *_Nonnull)fiveTuples
-                      processName:(nullable NSString *)processName
-                      processPath:(nullable NSString *)processPath
-                    developerName:(nullable NSString *)developerName
-                            allow:(BOOL)allow;
+                                 fiveTuples:(NSArray<fiveINetTuple *> *_Nonnull)fiveTuples
+                                      allow:(BOOL)allow
+                               processRules:(NSArray<ProcessRule*>* _Nullable) processRules;
 /// 快捷方法：是否涉及 DNS（目的端口 53 且协议 UDP/TCP）
 - (BOOL)isDNSRule;
+
 
 @end
 
@@ -148,12 +163,17 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
 //匹配出站的规则
 -(FirewallRule*_Nonnull)firstMatchedRuleForOutBound:(NSString*_Nonnull)_remoteHostName
                                          remotePort:(NSString*_Nonnull)_remotePort
-                                           protocol:(NSString*_Nonnull)_Protocol;
+                                           protocol:(NSString*_Nonnull)_Protocol
+                                            process:(Process* _Nonnull)_process;
 
 //匹配入站的规则
 -(FirewallRule*_Nonnull)firstMatchedRuleForInBound:(NSString*_Nonnull)_remoteIP
                                         localPort:(NSString*_Nonnull)_localPort
-                                          protocol:(NSString*_Nonnull)_Protocol;
+                                          protocol:(NSString*_Nonnull)_Protocol
+                                            process:(Process* _Nonnull)_process;
+
+- (BOOL)matchesProcess:(ProcessRule * _Nullable)processInfo  rules:(NSArray<FirewallRule *> *_Nullable)candidateRules;
+
 @end
 
 

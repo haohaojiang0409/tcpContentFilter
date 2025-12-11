@@ -13,7 +13,6 @@
 @interface Process ()
 //进程核心数据
 @property (nonatomic) ProcessCoreData coreData;
-
 @property (nonatomic, assign) BOOL pathResolved;
 @property (nonatomic, assign) BOOL signatureComputed;
 @property (nonatomic, assign) BOOL hashComputed;
@@ -38,7 +37,7 @@
         int err = proc_pidpath(_coreData.pid, _coreData.processPath, sizeof(_coreData.processPath));
         if (err > 0) {
             // 成功：result 是字节数，pathBuffer 已 null-terminated
-            [[Logger sharedLogger] info: @"%@", [NSString stringWithUTF8String: _coreData.processPath]];
+            //[[Logger sharedLogger] info: @"[Process::initWithFlowMetadata] %@", [NSString stringWithUTF8String: _coreData.processPath]];
         } else if (err == 0) {
             [[Logger sharedLogger] error: @"proc_pidpath failed: buffer too small or invalid PID"];
             // 实际上 PROC_PIDPATHINFO_MAXSIZE 应该足够大，所以更可能是无效 PID
@@ -53,10 +52,7 @@
             _infoPlist = [self codeSignatureInfoForExecutableAtPath:str];
         }else{
             [[Logger sharedLogger] warning:@"[initWithFlowMetadata] _sha256HashStr is null"];
-
         }
-        // 3. Bundle ID 需要从签名或系统接口获取，不能用 mainBundle！
-        
     }
     //打印日志
     [self logAllProperties];
@@ -91,6 +87,7 @@
     }
     return [hex copy];
 }
+
 #pragma mark - 获取进程的apple签发数字签名
 -(NSDictionary *)codeSignatureInfoForExecutableAtPath:(NSString *)exePath{
     if(!exePath || ![[NSFileManager defaultManager] fileExistsAtPath:exePath]){
@@ -141,11 +138,16 @@
     
     // Info.plist 内容（简略）
     if (self.infoPlist && [self.infoPlist count] > 0) {
-        [logger info:@"Info.plist Keys: %@ values : %@", [self.infoPlist allKeys] ,[self.infoPlist allValues]];
+        [logger info:@"Info.plist Keys: %@", [self.infoPlist allKeys]];
     } else {
         [logger warning:@"Info.plist: (null or empty)"];
     }
     
     [logger info:@"====================\n"];
+}
+
+#pragma mark - get/set方法
+-(ProcessCoreData)getCoreData{
+    return _coreData;
 }
 @end

@@ -2,303 +2,90 @@
     "code": 200,
     "message": "Success",
     "data": {
-        "rules": [
-            {
-                "chinese": {
-                    "title": "禁止访问",
-                    "suggestion": "基于企业安全管理要求，以下访问被禁止。{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "english": {
-                    "title": "Prohibited Access",
-                    "suggestion": "Based on enterprise security management requirements, the following access is denied.{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "level": 20,
-                "direction": "in",
-                "proto": "tcp|udp",
-                "action": "pass",
-                "policy_name": "firewall-test-update-update",
-                "policy_id": "edr_fw_bb8c11c9-4f73-410c-82e5-63af6c5dd82e",
-                "processes": [
-                    {
-                        "company": "test"
-                    }
-                ]
+        "rules": [{
+            "chinese": {
+                "title": "禁止访问",
+                "suggestion": "基于企业安全管理要求， {{domain}}:{{dstport}} | {{srcip}}:{{srcport}} -\u003e {{dstip}}:{{dstport}}  禁止访问0",
+                "tip": -1
             },
-            {
-                "chinese": {
-                    "title": "禁止访问",
-                    "suggestion": "基于企业安全管理要求，以下访问被禁止。{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "english": {
-                    "title": "Prohibited Access",
-                    "suggestion": "Based on enterprise security management requirements, the following access is denied.{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "level": 18,
-                "direction": "in",
-                "proto": "tcp|udp",
-                "action": "pass",
-                "policy_name": "firewall-test-update-update",
-                "policy_id": "edr_fw_580c8714-7d12-4c62-af41-aacd8bcf36d7",
-                "processes": [
-                    {
-                        "company": "test"
-                    }
-                ]
+            "english": {
+                "title": "Prohibited Access",
+                "suggestion": "Based on enterprise security management requirements, access to Address: #Domain Address / #IP:Port is denied.",
+                "tip": -1
             },
-            {
-                "chinese": {
-                    "title": "禁止访问",
-                    "suggestion": "基于企业安全管理要求，以下访问被禁止。{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}"
-                },
-                "english": {
-                    "title": "Prohibited Access",
-                    "suggestion": "Based on enterprise security management requirements, the following access is denied.{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}"
-                },
-                "level": 17,
-                "direction": "in",
-                "proto": "tcp|udp",
-                "action": "blocked",
-                "policy_name": "firewall-test-update-update",
-                "policy_id": "edr_fw_aa5fdaba-a45d-46d5-8f70-ef537a09ed11",
-                "processes": [
-                    {
-                        "company": "test"
-                    }
-                ],
-                "tuples": [
-                    {
-                        "source_ip": "0.0.0.0",
-                        "dst_port": [
-                            "80"
-                        ]
-                    }
-                ]
+            "level": 15,
+            "direction": "out",
+            "proto": "tcp|udp",
+            "action": "pass",
+            "policy_name": "111",
+            "policy_id": "edr_fw_490b10e6-12af-41a7-9d15-1eda451a9304",
+            "tuples": [{
+                "dst_port": ["90"],
+                "dst_host": "*.feishu.cn"
+            }]
+        }, {
+            "chinese": {
+                "title": "禁止访问",
+                "suggestion": "基于企业安全管理要求， {{domain}}:{{dstport}} | {{srcip}}:{{srcport}} -\u003e {{dstip}}:{{dstport}}  禁止访问0",
+                "tip": -1
             },
-            {
-                "chinese": {
-                    "title": "禁止访问",
-                    "suggestion": "基于企业安全管理要求，以下访问被禁止。{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "english": {
-                    "title": "Prohibited Access",
-                    "suggestion": "Based on enterprise security management requirements, the following access is denied.{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "level": 16,
-                "direction": "in",
-                "proto": "tcp|udp",
-                "action": "pass",
-                "policy_name": "sdgvsgdsascas",
-                "policy_id": "edr_fw_695e3f25-2854-41be-8e5a-6498671b27a0"
+            "english": {
+                "title": "Prohibited Access",
+                "suggestion": "Based on enterprise security management requirements, access to Address: #Domain Address / #IP:Port is denied.",
+                "tip": -1
             },
-            {
-                "chinese": {
-                    "title": "禁止访问",
-                    "suggestion": "基于企业安全管理要求， {{domain}}:{{dstport}} | {{srcip}}:{{srcport}} -\u003e {{dstip}}:{{dstport}}  禁止访问0",
-                    "tip": -1
-                },
-                "english": {
-                    "title": "Prohibited Access",
-                    "suggestion": "Based on enterprise security management requirements, access to Address: #Domain Address / #IP:Port is denied.",
-                    "tip": -1
-                },
-                "level": 2,
-                "direction": "in",
-                "proto": "tcp|udp",
-                "action": "pass",
-                "policy_name": "jth_chr",
-                "policy_id": "edr_fw_42dfc63c-7d3c-4d85-8d5b-296c8c1427b1",
-                "tuples": [{
-                    "source_ip": "0.0.0.0",
-                    "dst_port": ["443"]
-                }]
+            "level": 5,
+            "direction": "out",
+            "proto": "tcp|udp|icmp",
+            "action": "block",
+            "report": 1,
+            "policy_name": "chr_test",
+            "policy_id": "edr_fw_5bad06e9-08fd-4702-b888-10d3fcd62125",
+            "tuples": [{
+                "dst_port": ["443"],
+                "dst_host": "www.baidu.com"
+            }, {
+                "dst_port": ["80"],
+                "dst_host": "www.baidu.com"
+            }]
+        }, {
+            "chinese": {
+                "title": "禁止访问",
+                "suggestion": "基于企业安全管理要求， {{domain}}:{{dstport}} | {{srcip}}:{{srcport}} -\u003e {{dstip}}:{{dstport}}  禁止访问0",
+                "tip": -1
             },
-    
-            {
-                "chinese": {
-                    "title": "禁止访问",
-                    "suggestion": "基于企业安全管理要求，以下访问被禁止。{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "english": {
-                    "title": "Prohibited Access",
-                    "suggestion": "Based on enterprise security management requirements, the following access is denied.{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "level": 14,
-                "direction": "in",
-                "proto": "tcp|udp",
-                "action": "pass",
-                "policy_name": "sdgvsgdsasasdsdascas",
-                "policy_id": "edr_fw_7b18dadb-dcdc-4840-9ce6-fb8d2b0e82b5"
+            "english": {
+                "title": "Prohibited Access",
+                "suggestion": "Based on enterprise security management requirements, access to Address: #Domain Address / #IP:Port is denied.",
+                "tip": -1
             },
-            {
-                "chinese": {
-                    "title": "禁止访问",
-                    "suggestion": "基于企业安全管理要求，以下访问被禁止。{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "english": {
-                    "title": "Prohibited Access",
-                    "suggestion": "Based on enterprise security management requirements, the following access is denied.{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "level": 13,
-                "direction": "in",
-                "proto": "tcp|udp",
-                "action": "pass",
-                "policy_name": "sdgvsgdsasasdsdascas",
-                "policy_id": "edr_fw_c8d7ffc7-e2c4-462a-b080-6e3dabe7d526"
-            },
-            {
-                "chinese": {
-                    "title": "禁止访问",
-                    "suggestion": "基于企业安全管理要求，以下访问被禁止。{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "english": {
-                    "title": "Prohibited Access",
-                    "suggestion": "Based on enterprise security management requirements, the following access is denied.{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "level": 11,
-                "direction": "in",
-                "proto": "tcp|udp",
-                "action": "pass",
-                "policy_name": "sdgvsgdsdfsdfdsfsdasasdsdascas",
-                "policy_id": "edr_fw_4bd9fa8c-c589-43da-b79d-8f64c2a241db"
-            },
-            {
-                "chinese": {
-                    "title": "禁止访问",
-                    "suggestion": "基于企业安全管理要求，以下访问被禁止。{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "english": {
-                    "title": "Prohibited Access",
-                    "suggestion": "Based on enterprise security management requirements, the following access is denied.{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "level": 10,
-                "direction": "in",
-                "proto": "tcp|udp",
-                "action": "pass",
-                "policy_name": "sdgvsgddddsdfsdfdsfsdasasdsdascas",
-                "policy_id": "edr_fw_a4cddd45-61e6-4737-be17-7c335210a70a"
-            },
-            {
-                "chinese": {
-                    "title": "禁止访问",
-                    "suggestion": "基于企业安全管理要求，以下访问被禁止。{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "english": {
-                    "title": "Prohibited Access",
-                    "suggestion": "Based on enterprise security management requirements, the following access is denied.{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "level": 9,
-                "direction": "out",
-                "proto": "tcp|udp",
-                "action": "blocked",
-                "policy_name": "sdgvsgddddsd111111fsdfdsfsdasasdsdascas",
-                "policy_id": "edr_fw_07cf18b3-881e-48d8-a8b6-de8c0d55a7bb",
-                "processes": [
-                    {
-                        "path": "fasdfads"
-                    }
-                ],
-                "tuples": [
-                    {
-                        "dst_ip": "10.20.3.32",
-                        "dst_port": [
-                            "80"
-                        ]
-                    }
-                ]
-            },
-            {
-                "chinese": {
-                    "title": "禁止访问",
-                    "suggestion": "基于企业安全管理要求，以下访问被禁止。{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "english": {
-                    "title": "Prohibited Access",
-                    "suggestion": "Based on enterprise security management requirements, the following access is denied.{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "level": 2,
-                "direction": "out",
-                "proto": "tcp|udp",
-                "action": "pass",
-                "policy_name": "测试",
-                "policy_id": "edr_fw_f1cff700-c96d-4ecd-b31e-83866636fd0f",
-                "processes": [
-                    {
-                        "process_name": "*测试*"
-                    },
-                    {
-                        "process_name": "*测试3*"
-                    },
-                    {
-                        "process_name": "*测试1*"
-                    },
-                    {
-                        "process_name": "*测试2*"
-                    },
-                    {
-                        "process_name": "1111",
-                        "process_des": "fasdfasdf"
-                    }
-                ],
-                "tuples": [
-                    {
-                        "dst_ip": "192.168.3.121",
-                        "dst_port": [
-                            "1-65535"
-                        ]
-                    }
-                ]
-            },
-            {
-                "chinese": {
-                    "title": "禁止访问",
-                    "suggestion": "基于企业安全管理要求，以下访问被禁止。{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "english": {
-                    "title": "Prohibited Access",
-                    "suggestion": "Based on enterprise security management requirements, the following access is denied.{{domain}}/{{srcip}}:{{srcport}}/{{dstip}}:{{dstport}}",
-                    "tip": -1
-                },
-                "level": 7,
-                "direction": "out",
-                "proto": "tcp|udp",
-                "action": "block",
-                "policy_name": "wnagyongceshifenzu",
-                "policy_id": "edr_fw_c7898113-3c80-498e-a695-448c531acbc3",
-                "processes": [
-                    {
-                        "path": "fdasfas"
-                    }
-                ],
-                "tuples": [
-                    {
-                        "dst_port": [
-                            "1-65535"
-                        ],
-                        "dst_host": "www.baidu.com"
-                    }
-                ]
-            }
-        ]
+            "level": 4,
+            "direction": "out",
+            "proto": "tcp|udp|icmp",
+            "action": "pass",
+            "report": 1,
+            "policy_name": "jth_chr",
+            "policy_id": "edr_fw_42dfc63c-7d3c-4d85-8d5b-296c8c1427b1",
+            "processes": [{
+                "process_name": "com.eagley",
+                "hash256": "b115030c6abeaee8d7a8dd5008c8101d9ec",
+                "path": "/Library/PrivilegedHelperTr"
+            }, {
+                "process_name": "11111",
+                "company": "company",
+                "hash256": "1241241212",
+                "process_des": "123124124",
+                "origin_filename": "14124142",
+                "product_des": "12121111",
+                "path": "123123",
+                "signer": "23141"
+            }],
+            "tuples": [{
+                "dst_port": ["1-65535"],
+                "dst_host": "www.baidu.com"
+            }]
+        }]
     },
-    "data_version": "1156804374",
+    "data_version": "169974435",
     "data_not_changed": false
 }

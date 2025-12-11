@@ -78,7 +78,7 @@
         return nil;
     }
     
-    // 等待信号量
+    // 等待信号量 ，最多等待10秒钟
     dispatch_time_t waitTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(timeout * NSEC_PER_SEC));
     long result = dispatch_semaphore_wait(self.loadSemaphore, waitTime);
     
@@ -154,7 +154,7 @@
         dispatch_semaphore_signal(self.loadSemaphore);
     }];
 
-    //发送请求
+    //异步执行task
     [task resume];
 }
 

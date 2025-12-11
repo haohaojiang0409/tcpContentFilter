@@ -190,7 +190,6 @@
         NSLog(@"Logger error: %@", exception.reason);
     }
 }
-
 - (BOOL)shouldRotateLogFile {
     NSFileManager *fileManager = [NSFileManager defaultManager];
     if (![fileManager fileExistsAtPath:self.logFilePath]) {
