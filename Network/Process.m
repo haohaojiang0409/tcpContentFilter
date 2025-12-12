@@ -137,11 +137,11 @@
     }
     
     // Info.plist 内容（简略）
-    if (self.infoPlist && [self.infoPlist count] > 0) {
-        [logger info:@"Info.plist Keys: %@", [self.infoPlist allKeys]];
-    } else {
-        [logger warning:@"Info.plist: (null or empty)"];
-    }
+//    if (self.infoPlist && [self.infoPlist count] > 0) {
+//        [logger info:@"Info.plist Keys: %@", [self.infoPlist allKeys]];
+//    } else {
+//        [logger warning:@"Info.plist: (null or empty)"];
+//    }
     
     [logger info:@"====================\n"];
 }

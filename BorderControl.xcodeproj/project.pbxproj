@@ -12,8 +12,8 @@
 		44766DE02ED0099A00814D30 /* Rule.m in Sources */ = {isa = PBXBuildFile; fileRef = 44766DDF2ED0099800814D30 /* Rule.m */; };
 		44C04C852EE81A5300D3BD42 /* Process.m in Sources */ = {isa = PBXBuildFile; fileRef = 44C04C842EE81A5200D3BD42 /* Process.m */; };
 		44C04C892EE9546C00D3BD42 /* libbsm.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 44C04C882EE9544300D3BD42 /* libbsm.tbd */; };
-		44C04C8B2EE9772000D3BD42 /* rule.json in Resources */ = {isa = PBXBuildFile; fileRef = 44C04C8A2EE9772000D3BD42 /* rule.json */; };
 		44C04C8E2EEA62F400D3BD42 /* log.m in Sources */ = {isa = PBXBuildFile; fileRef = 44C04C8D2EEA62F400D3BD42 /* log.m */; };
+		44C04C902EEBB40B00D3BD42 /* rule.json in Resources */ = {isa = PBXBuildFile; fileRef = 44C04C8A2EE9772000D3BD42 /* rule.json */; };
 		44F6A8172EE2BA6A0073BD27 /* DomainIPCache.m in Sources */ = {isa = PBXBuildFile; fileRef = 44F6A8162EE2BA680073BD27 /* DomainIPCache.m */; };
 		63938C572A38BCD600734619 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 63938C562A38BCD600734619 /* AppDelegate.m */; };
 		63938C5A2A38BCD600734619 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 63938C592A38BCD600734619 /* ViewController.m */; };
@@ -163,7 +163,6 @@
 		63938C542A38BCD600734619 /* BorderControl */ = {
 			isa = PBXGroup;
 			children = (
-				44C04C8A2EE9772000D3BD42 /* rule.json */,
 				6378C62F2A47F1A400E1D2C4 /* Info.plist */,
 				63938C552A38BCD600734619 /* AppDelegate.h */,
 				63938C562A38BCD600734619 /* AppDelegate.m */,
@@ -210,6 +209,7 @@
 				63938C752A38BD2C00734619 /* main.m */,
 				63938C772A38BD2C00734619 /* Info.plist */,
 				63938C782A38BD2C00734619 /* Network.entitlements */,
+				44C04C8A2EE9772000D3BD42 /* rule.json */,
 			);
 			path = Network;
 			sourceTree = "<group>";
@@ -297,7 +297,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				44C04C8B2EE9772000D3BD42 /* rule.json in Resources */,
 				63938C5C2A38BCD800734619 /* Assets.xcassets in Resources */,
 				63938C5F2A38BCD800734619 /* Main.storyboard in Resources */,
 			);
@@ -307,6 +306,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				44C04C902EEBB40B00D3BD42 /* rule.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

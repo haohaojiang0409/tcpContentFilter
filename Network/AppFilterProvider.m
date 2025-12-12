@@ -9,42 +9,65 @@
 #include <sys/time.h>
 #import <Network/Network.h>
 #include <arpa/inet.h>
-@interface AppFilterProvider()
+@interface AppFilterProvider(){
+    BOOL hasReceivedInitialLoad;
+}
 @property (nonatomic, strong) RulePollingManager *rulePollingManager;
 @end
 @implementation AppFilterProvider
 #pragma mark - 加载过滤配置
 - (void)startFilterWithCompletionHandler:(void (^)(NSError * _Nullable))completionHandler {
-    Logger * log = [Logger sharedLogger];
+    Logger *log = [Logger sharedLogger];
     [log info:@"-------[startFilterWithCompletionHandler] is started------"];
-    // 1️⃣ 初始化规则管理器
-    FirewallRuleManager *rulesManager = [FirewallRuleManager sharedManager];
 
-    // 2️⃣ 初始化规则轮询加载器
-    NSURL* ruleURL = [NSURL URLWithString:@"https://sp.pre.eagleyun.cn/api/agent/v1/edr/firewall_policy/get_firewall_detail_config"];
+    NSURL *ruleURL = [NSURL URLWithString:@"https://sp.pre.eagleyun.cn/api/agent/v1/edr/firewall_policy/get_firewall_detail_config"];
     self.rulePollingManager = [[RulePollingManager alloc] initWithURL:ruleURL];
     
-    //创建信号量用于同步等待
-    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
-    __block NSError* loadError = nil;
+    // 加载初始规则
+    [self loadInitialRulesWithCompletion:^(NSError *error) {
+        //如果通过网络初始化规则就加载本地规则
+        if (error) {
+            [[Logger sharedLogger] info:@"Failed to load initial rules: %@", error.localizedDescription];
+            [self tryLoadCachedRules]; // fallback 到本地
+        } else {
+            [[Logger sharedLogger] info:@"Initial rules loaded successfully"];
+        }
+        
+        // 应用过滤设置
+        [self applyFilterSettingsWithCompletion:completionHandler];
+
+        // 启动定期轮询（注意：不要在 completionHandler 内部启动，避免阻塞）
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+            [self.rulePollingManager startPolling];
+        });
+    }];
+}
+
+#pragma mark - 加载规则
+- (void)loadInitialRulesWithCompletion:(void(^)(NSError *error))completion {
     
-    self.rulePollingManager.onJSONReceived = ^(NSDictionary<NSString *, id> * _Nonnull json) {
-        // 注意：json 已经是解析好的 NSDictionary，无需再用 NSJSONSerialization 解析！
-            if (!json || json.count == 0) {
-                loadError = [NSError errorWithDomain:@"RuleLoadError" code:-1 userInfo:@{NSLocalizedDescriptionKey:@"Rules JSON is empty"}];
-                os_log(firewallLog , "Failed to read rule.json or file is empty");
-                return;
-            }else {
+    //避免重复调用
+    if (hasReceivedInitialLoad) {
+        completion(nil);
+        return;
+    }
+
+    //信号量初始化
+    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+    __block NSError *loadError = nil;
+
+    // 设置回调函数
+    self.rulePollingManager.onJSONReceived = ^(NSDictionary<NSString *, id> *json) {
+        @autoreleasepool {
+            // 确保只处理一次
+            BOOL success = NO;
+            if (json && [json isKindOfClass:[NSDictionary class]]) {
                 NSDictionary *dataDict = json[@"data"];
-                NSArray *rawRules = dataDict[@"rules"];
+                NSArray *rawRules = dataDict ? dataDict[@"rules"] : nil;
                 
-                if (![rawRules isKindOfClass:[NSArray class]] || rawRules.count == 0) {
-                    loadError = [NSError errorWithDomain:@"RuleLoadError" code:-2 userInfo:@{NSLocalizedDescriptionKey:@"No rules in 'data.rules'"}];
-                    [[Logger sharedLogger] info:@"No rules in 'data.rules'"];
-                    return;
-                }else{
+                if ([rawRules isKindOfClass:[NSArray class]] && rawRules.count > 0) {
                     FirewallRuleManager *manager = [FirewallRuleManager sharedManager];
-                    [manager removeAllRules]; // 清空前一次规则
+                    [manager removeAllRules];
                     
                     NSUInteger total = 0;
                     for (NSDictionary *rawRule in rawRules) {
@@ -54,68 +77,63 @@
                             total++;
                         }
                     }
-                    [[Logger sharedLogger] info:@"Loaded and registered %lu firewall rule objects", (unsigned long)total];
+                    [[Logger sharedLogger] info:@"Loaded %lu firewall rule objects", (unsigned long)total];
+                    success = YES;
+                } else {
+                    loadError = [NSError errorWithDomain:@"RuleLoadError" code:-2
+                               userInfo:@{NSLocalizedDescriptionKey:@"No rules in 'data.rules'"}];
+                    [[Logger sharedLogger] info:@"No rules in 'data.rules'"];
                 }
-            }
-        dispatch_semaphore_signal(semaphore);
-    };
-    // 开始轮询
-    [self.rulePollingManager startPolling];
-// ✅ 5️⃣ 同步等待首次规则加载完成（最多等待 10 秒）
-    loadError = [self.rulePollingManager waitForInitialLoadWithTimeout:10.0];
-    
-    if (loadError) {
-        [[Logger sharedLogger] info:@"Failed to load initial rules from network: %@", loadError.localizedDescription];
-        
-        // ❗️ 尝试加载本地缓存规则
-        [self tryLoadCachedRules];
-        
-        [[Logger sharedLogger] info:@"Starting with cached rules due to network error" ];
-    } else {
-        [[Logger sharedLogger] info:@"Initial rules loaded successfully from network" ];
-    }
-    //启动超时定时器
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW ,(int64_t)(10.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        dispatch_semaphore_signal(semaphore);
-    });
-    
-    //同步等待规则加载完成
-    dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
-    
-    // 4️⃣ 初始化日志变量
-    firewallLog = os_log_create("com.eagleyun.BorderControl", "Network");
-    [[Logger sharedLogger] info:@"Filter started"];
-       NSFileManager *filemgr;
-       // end pcap initialization
-        NENetworkRule* networkRule = [
-          [NENetworkRule alloc]
-          initWithRemoteNetwork:nil
-          remotePrefix:0
-          localNetwork:nil
-          localPrefix:0
-          protocol:NENetworkRuleProtocolAny
-          direction:NETrafficDirectionAny
-        ];
-        NEFilterRule* filterRule = [
-          [NEFilterRule alloc]
-          initWithNetworkRule:networkRule
-          action:NEFilterActionFilterData
-        ];
-        NEFilterSettings* filterSettings = [
-          [NEFilterSettings alloc]
-          initWithRules:@[filterRule]
-          defaultAction:NEFilterActionFilterData
-        ];
-        [self applySettings:filterSettings completionHandler:^(NSError * _Nullable error) {
-            if (error) {
-                os_log(firewallLog , "Failed to start filter: %{public}@", error.localizedDescription);
             } else {
-                os_log(firewallLog , "Network filter started successfully");
+                loadError = [NSError errorWithDomain:@"RuleLoadError" code:-1
+                           userInfo:@{NSLocalizedDescriptionKey:@"Invalid or empty JSON response"}];
+                [[Logger sharedLogger] info:@"Rules JSON is invalid or empty"];
             }
-            completionHandler(error);
-        }];
+            //发送信号
+            dispatch_semaphore_signal(semaphore);
+        }
+    };
+
+    // 发起首次请求
+    [self.rulePollingManager fetchOnce];
+
+    // 等待最多 10 秒
+    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_SEC));
+    if (dispatch_semaphore_wait(semaphore, timeout) != 0) {
+        // 超时
+        loadError = [NSError errorWithDomain:@"RuleLoadError" code:-3
+                   userInfo:@{NSLocalizedDescriptionKey:@"Initial rule load timeout"}];
+        [[Logger sharedLogger] error:@"Initial rule load timeout"];
+    }
+
+    completion(loadError);
 }
 
+#pragma mark -- 应用过滤设置
+-(void)applyFilterSettingsWithCompletion:(void(^)(NSError * _Nullable))completionHandler{
+    NENetworkRule* networkRule = [
+            [NENetworkRule alloc]
+            initWithRemoteNetwork:nil
+            remotePrefix:0
+            localNetwork:nil
+            localPrefix:0
+            protocol:NENetworkRuleProtocolAny
+            direction:NETrafficDirectionAny
+        ];
+        NEFilterRule* filterRule = [
+            [NEFilterRule alloc]
+            initWithNetworkRule:networkRule
+            action:NEFilterActionFilterData
+        ];
+        NEFilterSettings* filterSettings = [
+            [NEFilterSettings alloc]
+            initWithRules:@[filterRule]
+            defaultAction:NEFilterActionFilterData
+        ];
+        [self applySettings:filterSettings completionHandler:completionHandler];
+}
+
+#pragma mark -- 停止过滤
 - (void)stopFilterWithReason:(NEProviderStopReason)reason completionHandler:(void (^)(void))completionHandler {
     NSLog(@"Packet filter stopped: %ld", (long)reason);
     if (self.rulePollingManager) {
@@ -135,8 +153,11 @@
 //2.扩展截获的是发往所有网卡的数据包？可以选，默认所有网卡
 //3.IPPROTO_UDP 和 NENetworkRuleProtocolUDP的区别？ 前者是应用于socket层，后者应用于IP层
 - (NEFilterNewFlowVerdict *)handleNewFlow:(NEFilterFlow *)flow {
+    if([self isOwnFlow:flow]){
+        return [NEFilterNewFlowVerdict allowVerdict];
+    }
     if (![flow isKindOfClass:[NEFilterSocketFlow class]]) {
-        os_log(firewallLog , "[FLOW] Non-socket flow, allowing.");
+        [[Logger sharedLogger] info:@"[FLOW] Non-socket flow, allowing."];
         return [NEFilterNewFlowVerdict allowVerdict];
     }
     
@@ -144,12 +165,18 @@
     return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:NO peekInboundBytes:0 filterOutbound:YES peekOutboundBytes:1024];
 }
 
+#pragma mark -- 判断是否自己的流
+-(BOOL)isOwnFlow:(NEFilterFlow *)flow{
+    NSString * ownBundleID = @"com.eagleyun.BorderControl.Network";
+    return [ownBundleID isEqualToString:flow.description];
+}
+
 #pragma mark -- 处理出站的所有流
 ///建立连接之前就可以获取到流
 - (NEFilterDataVerdict *)handleOutboundDataFromFlow:(NEFilterFlow *)flow
                                 readBytesStartOffset:(NSUInteger)offset
                                            readBytes:(NSData *)readBytes {
-    os_log(firewallLog , "handleOutboundDataCompleteForFlow");
+    [[Logger sharedLogger] info:@"handleOutboundDataCompleteForFlow"];
     // 获取当前时间
     NSDate *currentDate = [NSDate date];
     NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
@@ -157,8 +184,7 @@
     NSString *currentTimeString = [dateFormatter stringFromDate:currentDate];
     
     // 打印流ID和当前时间
-    os_log(firewallLog , "Flow ID: %{public}@, Time: %{public}@ ", flow.identifier, currentTimeString);
-    
+    [[Logger sharedLogger] info:@"Flow ID: %@, Time: %@ " , flow.identifier , currentTimeString];
     FirewallRuleManager *manager = [FirewallRuleManager sharedManager];
     NEFilterSocketFlow* socketFlow = (NEFilterSocketFlow*)flow;
     NWHostEndpoint* remoteEP = socketFlow.remoteEndpoint;
@@ -177,7 +203,7 @@
     }//获取ip地址
     else if(nil != remoteEP.hostname){
         remoteHostName = remoteEP.hostname;
-        os_log(firewallLog ,"---- %{public}@ remoteEP hostname:%{public}@is not nil"  , flow.identifier , remoteHostName);
+        [[Logger sharedLogger] info:@"%@ remoteEP hostname:%@is not nil" , flow.identifier , remoteHostName];
     }
     
     
@@ -193,9 +219,9 @@
     if(isIPv4){
         NSString* domainName = [[DomainIPCache sharedCache] domainForIP:remoteHostName];
         if(domainName){
-            os_log(firewallLog , "the %{public}@ is a ipv4 addresss and hostName is %{public}@" , remoteHostName , domainName);
+            [[Logger sharedLogger] info:@"the %@ is a ipv4 addresss and hostName is %@" , remoteHostName, domainName];
         }else{
-            os_log(firewallLog, "the %{public}@ has no domain in cache" , remoteHostName);
+            [[Logger sharedLogger] info:@"the %@ has no domain in cache" , remoteHostName];
         }
     }
     
@@ -205,23 +231,25 @@
     
     //分情况讨论：TCP和UDP和其他
     if(IPPROTO_TCP == socketFlow.socketProtocol){
-        os_log(firewallLog ,"---- %{public}@ isTCPFlow----",flow.identifier);
+        [[Logger sharedLogger] info:@"---- %@ isTCPFlow----" , flow.identifier];
         matchedRule = [manager firstMatchedRuleForOutBound:remoteHostName remotePort:port protocol:@"tcp" process:process];
         if(matchedRule && matchedRule.allow == NO){
             //有对应规则且规则中为阻塞，就把这个流过滤掉
-            os_log(firewallLog, "==== firewallRule is matched : %{public}@ ",remoteHostName);
-            
+            [[Logger sharedLogger] info:@"firewallRule is matched : %@ " , remoteHostName];
             return [NEFilterDataVerdict dropVerdict];
         }
-    }else if(IPPROTO_UDP == socketFlow.socketProtocol){
-        //分两种情况：DNS-UDP和其他UDP
-        if([self isDNSFlow:flow]){
-            os_log(firewallLog , "[ID : %{public}@ is DNS",flow.identifier);
-        }else{
-            os_log(firewallLog ,"---- %{public}@  isUDPFlow ----",flow.identifier);
-            matchedRule = [manager firstMatchedRuleForOutBound:remoteHostName remotePort:port protocol:@"udp" process:process];
-            if(matchedRule && matchedRule.allow == NO){
-                os_log(firewallLog, "==== firewallRule is matched : %{public}@ ",remoteHostName);
+    } else if (IPPROTO_UDP == socketFlow.socketProtocol) {
+
+        if ([self isDNSFlow:flow]) {
+            [[Logger sharedLogger] info:@"[ID : %@ is DNS", flow.identifier];
+        } else {
+            [[Logger sharedLogger] info:@"---- %@ is UDPFlow ----", flow.identifier];
+            matchedRule = [manager firstMatchedRuleForOutBound:remoteHostName
+                                                  remotePort:port
+                                                    protocol:@"udp"
+                                                     process:process];
+            if (matchedRule && !matchedRule.allow) {
+                [[Logger sharedLogger] info:@"==== firewallRule is matched : %@ ====", remoteHostName];
                 return [NEFilterDataVerdict dropVerdict];
             }
         }
@@ -251,47 +279,46 @@
 }
 
 #pragma mark -- 处理入站的流
-- (NEFilterDataVerdict *) handleInboundDataFromFlow:(NEFilterFlow *) flow
-                                readBytesStartOffset:(NSUInteger) offset
-                                           readBytes:(NSData *) readBytes{
-    NEFilterSocketFlow* socketFlow = (NEFilterSocketFlow*)flow;
-    NSString* remoteHostName = nil;
-    NWHostEndpoint* remoteEP = socketFlow.remoteEndpoint;
-    //1.获取远程IP
-    remoteHostName = remoteEP.hostname;
-    NSString* port = remoteEP.port;
-    os_log(firewallLog , "---- %{public}@ socket remoteEP ip Name:%{public}@ is not nil " , flow.identifier , remoteHostName);
+- (NEFilterDataVerdict *)handleInboundDataFromFlow:(NEFilterFlow *)flow
+                              readBytesStartOffset:(NSUInteger)offset
+                                         readBytes:(NSData *)readBytes {
+    NEFilterSocketFlow *socketFlow = (NEFilterSocketFlow *)flow;
+    NSString *remoteHostName = nil;
+    NWHostEndpoint *remoteEP = socketFlow.remoteEndpoint;
     
-    //2.进行入站匹配
+    // 1. 获取远程 IP
+    remoteHostName = remoteEP.hostname;
+    NSString *port = remoteEP.port;
+    [[Logger sharedLogger] info:[NSString stringWithFormat:@"---- %@ socket remoteEP ip Name: %@ is not nil", flow.identifier, remoteHostName]];
+    
+    // 2. 进行入站匹配
     NSDate *currentDate = [NSDate date];
     NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
     [dateFormatter setDateFormat:@"yyyy-MM-dd HH:mm:ss.SSS"];
     NSString *currentTimeString = [dateFormatter stringFromDate:currentDate];
     
-    //3. 打印流ID和当前时间
-    os_log(firewallLog , "Flow ID: %{public}@, Time: %{public}@ ", flow.identifier, currentTimeString);
+    // 3. 打印流 ID 和当前时间
+    [[Logger sharedLogger] info:@"Flow ID: %@, Time: %@", flow.identifier, currentTimeString];
     
     FirewallRuleManager *manager = [FirewallRuleManager sharedManager];
+    FirewallRule *rule = nil;
     
-    FirewallRule * rule = nil;
+    // 获取进程信息
+    NSData *processData = flow.sourceProcessAuditToken;
+    Process *process = [[Process alloc] initWithFlowMetadata:flow.sourceProcessAuditToken];
+    ProcessRule *_processRule = [ProcessRule ruleWithProcess:process];
     
-    //获取进程信息
-    NSData* processData = flow.sourceProcessAuditToken;
-    //获取C结构体对象
-    Process* process = [[Process alloc] initWithFlowMetadata:flow.sourceProcessAuditToken];
-    //转化为rule对象
-    ProcessRule * _processRule = [ProcessRule ruleWithProcess:process];
-    //4. 判断协议
-    if(IPPROTO_TCP == socketFlow.socketProtocol){
-        os_log(firewallLog , "---socketFlow[%{public}@] is a tcp flow---",flow.identifier);
+    // 4. 判断协议
+    if (IPPROTO_TCP == socketFlow.socketProtocol) {
+        [[Logger sharedLogger] info:@"---socketFlow[%@] is a tcp flow---", flow.identifier];
         rule = [manager firstMatchedRuleForInBound:remoteHostName localPort:port protocol:@"tcp" process:_processRule];
     } else if (IPPROTO_UDP == socketFlow.socketProtocol) {
         // 入站 UDP：可能是 DNS 响应
         if ([self isDNSResponseWithData:readBytes]) {
-            os_log(firewallLog, "---socketFlow[%{public}@] is a DNS RESPONSE---", flow.identifier);
+            [[Logger sharedLogger] info:@"---socketFlow[%@] is a DNS RESPONSE---", flow.identifier];
             
             // 异步解析 DNS，不阻塞当前线程
-            NSData *dnsDataCopy = [readBytes copy]; // 防止原 data 被释放
+            NSData *dnsDataCopy = [readBytes copy];
             dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
                 @autoreleasepool {
                     [self parseDNSResponse:dnsDataCopy forFlow:flow];
@@ -299,13 +326,14 @@
             });
             return [NEFilterDataVerdict allowVerdict];
         } else {
-            os_log(firewallLog, "---socketFlow[%{public}@] is a UDP flow---", flow.identifier);
+            [[Logger sharedLogger] info:@"---socketFlow[%@] is a UDP flow---", flow.identifier];
             rule = [manager firstMatchedRuleForInBound:remoteHostName localPort:port protocol:@"udp" process:process];
         }
-    }else{
-        os_log(firewallLog , "===the flow[%{public}@] is not network flow===",flow.identifier);
+    } else {
+        [[Logger sharedLogger] info:@"===the flow[%@] is not network flow===", flow.identifier];
     }
-    if(rule && rule.allow == NO){
+    
+    if (rule && !rule.allow) {
         return [NEFilterDataVerdict dropVerdict];
     }
     return [NEFilterDataVerdict allowVerdict];
@@ -328,23 +356,22 @@
 
 #pragma mark -- 解析 DNS Response，提取域名和IP映射
 - (void)parseDNSResponse:(NSData *)data forFlow:(NEFilterFlow *)flow {
-    //1.跳过DNS头部
+    // 1. 跳过 DNS 头部
     if (data.length < 12) return;
     
     const uint8_t *bytes = (const uint8_t *)[data bytes];
-    //2.读取QDcount和ANCount数量，由网络字节序转为主机序
-    uint16_t qdCount = ntohs(*(uint16_t*)(bytes + 4));  // Questions count
-    uint16_t anCount = ntohs(*(uint16_t*)(bytes + 6));  // Answers count
+    // 2. 读取 QDcount 和 ANCount 数量，由网络字节序转为主机序
+    uint16_t qdCount = ntohs(*(uint16_t *)(bytes + 4));  // Questions count
+    uint16_t anCount = ntohs(*(uint16_t *)(bytes + 6));  // Answers count
     if (qdCount == 0 || anCount == 0) {
-        os_log(firewallLog, "DNS response has no question or answer");
+        [[Logger sharedLogger] info:@"DNS response has no question or answer"];
         return;
     }
     
     // Step 1: 解析 Question -> 获取原始域名
-    //从偏移12开始，开始读取域名
     NSString *queryDomain = [self parseDomainFromDNSAtOffset:&bytes[12] data:data startOffset:12];
     if (!queryDomain || queryDomain.length == 0) {
-        os_log(firewallLog, "Failed to parse query domain in DNS response");
+        [[Logger sharedLogger] info:@"Failed to parse query domain in DNS response"];
         return;
     }
     
@@ -352,26 +379,22 @@
     NSUInteger offset = 12;
     NSString *dummy = [self parseDomainFromDNSAtOffset:&bytes[offset] data:data startOffset:offset];
     if (!dummy) return;
-    // 计算实际跳过的字节数（需重新解析以获取长度）
     NSUInteger questionEnd = [self getDomainLengthAtOffset:offset data:data];
     if (questionEnd == NSNotFound) return;
     offset = questionEnd + 4; // +4 for QTYPE + QCLASS
     
     // Step 3: 遍历 Answer Section
     for (int i = 0; i < anCount && offset < data.length; i++) {
-        // 跳过 NAME（可能是压缩指针）
         NSUInteger nameStart = offset;
         NSString *name = [self parseDomainFromDNSAtOffset:&bytes[offset] data:data startOffset:offset];
         if (!name) break;
         NSUInteger nameEnd = [self getDomainLengthAtOffset:nameStart data:data];
         if (nameEnd == NSNotFound) break;
         
-        if (offset + (nameEnd - nameStart) + 10 > data.length) break; // 至少还有 TYPE(2)+CLASS(2)+TTL(4)+RDLENGTH(2)
+        if (offset + (nameEnd - nameStart) + 10 > data.length) break;
         
-        uint16_t type = ntohs(*(uint16_t*)(bytes + nameEnd + 0));
-        // uint16_t class = ntohs(*(uint16_t*)(bytes + nameEnd + 2));
-        // uint32_t ttl = ntohl(*(uint32_t*)(bytes + nameEnd + 4));
-        uint16_t rdlength = ntohs(*(uint16_t*)(bytes + nameEnd + 8));
+        uint16_t type = ntohs(*(uint16_t *)(bytes + nameEnd + 0));
+        uint16_t rdlength = ntohs(*(uint16_t *)(bytes + nameEnd + 8));
         const uint8_t *rdata = &bytes[nameEnd + 10];
         
         if (type == 1 && rdlength == 4) { // A record (IPv4)
@@ -381,9 +404,7 @@
             inet_ntop(AF_INET, &addr, ipStr, INET_ADDRSTRLEN);
             NSString *ip = [NSString stringWithCString:ipStr encoding:NSUTF8StringEncoding];
             
-            os_log(firewallLog, "[DNS Cache] %{public}@ → %{public}@", queryDomain, ip);
-            
-            // 存入全局缓存（假设你有 DomainIPCache 单例）
+            [[Logger sharedLogger] info:@"[DNS Cache] %@ → %@", queryDomain, ip];
             [[DomainIPCache sharedCache] addMappingForDomain:queryDomain ip:ip];
             
         } else if (type == 28 && rdlength == 16) { // AAAA record (IPv6)
@@ -392,7 +413,7 @@
             char ip6Str[INET6_ADDRSTRLEN];
             inet_ntop(AF_INET6, &addr6, ip6Str, INET6_ADDRSTRLEN);
             NSString *ip6 = [NSString stringWithCString:ip6Str encoding:NSUTF8StringEncoding];
-            os_log(firewallLog, "[DNS Cache] %{public}@ → %{public}@", queryDomain, ip6);
+            [[Logger sharedLogger] info:@"[DNS Cache] %@ → %@", queryDomain, ip6];
             [[DomainIPCache sharedCache] addMappingForDomain:queryDomain ip:ip6];
         }
         
@@ -466,16 +487,14 @@
 #pragma mark - 加载本地规则兜底
 - (void)tryLoadCachedRules {
     // 构建本地规则文件路径
-    NSString *bundlePath = [[NSBundle mainBundle] pathForResource:@"rule" ofType:@"json"];
-    if (!bundlePath) {
-        [[Logger sharedLogger] error:@"Local rule.json not found in bundle path: %@" , bundlePath];
+    NSString *jsonPath = [[NSBundle bundleForClass:[self class]] pathForResource:@"rule" ofType:@"json"];
+    if (!jsonPath) {
+        [[Logger sharedLogger] error:@"Local rule.json not found in bundle path: %@" , jsonPath];
         return;
     }
     
-    [[Logger sharedLogger] info:@"%@", [NSString stringWithFormat:@"Loading cached rules from: %@", bundlePath]];
-    
     // 读取 JSON 文件
-    NSData *jsonData = [NSData dataWithContentsOfFile:bundlePath];
+    NSData *jsonData = [NSData dataWithContentsOfFile:jsonPath];
     if (!jsonData) {
         [[Logger sharedLogger] error:@"Failed to read local rule.json file"];
         return;

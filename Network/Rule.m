@@ -188,7 +188,7 @@
 
     //加载进程的相关规则
     
-    NSMutableArray<ProcessRule *> * processArr = [NSMutableArray alloc] ;
+    NSMutableArray<ProcessRule *> * processArr = [NSMutableArray array];
     NSArray *processStrs = dict[@"processes"];
     
     for (NSDictionary *ruleDict in processStrs) {
@@ -345,7 +345,7 @@
 -(FirewallRule*)firstMatchedRuleForOutBound:(NSString*)_remoteHostName
                                  remotePort:(NSString*)_remotePort
                                    protocol:(NSString*)_Protocol
-                                    process:(ProcessRule*)_processrule{
+                                    process:(Process*)_process{
     // 1. 获取该 direction + protocol 下的所有规则
     NSArray<FirewallRule *> *candidateRules = [self rulesForDirection:FlowDirectionOutbound protocol:_Protocol];
     if (candidateRules.count == 0) {
@@ -385,7 +385,9 @@
                     // 规则未指定 IP 范围 → 匹配任意 IP
                     [[Logger sharedLogger] info:@"[RuleManager OutBound ip has matched a rule]"];
                     //TODO : 匹配进程
-                    isMatched = [self matchesProcess:_processrule rules:candidateRules];
+                    //转化为oc对象
+                    ProcessRule* processRule = [ProcessRule ruleWithProcess:_process];
+                    isMatched = [self matchesProcess:processRule rules:candidateRules];
                     if(isMatched)
                         break;
                 }else{
@@ -481,10 +483,15 @@
 
 #pragma mark -- 是否匹配规则中设定的某个进程
 - (BOOL)matchesProcess:(ProcessRule *)processInfo  rules:(NSArray<FirewallRule *> *)candidateRules{
-    for (ProcessRule *rule in candidateRules) {
-        if ([rule matchesProcess:processInfo]) {
-            [[Logger sharedLogger] info:@"[RuleManager] is matched a process rule"];
-            return YES; // 命中一条即匹配
+    for (FirewallRule *rule in candidateRules) {
+        NSArray<ProcessRule *> * processRules = rule.processArr;
+        for(ProcessRule * proRule in processRules){
+            if ([proRule matchesProcess:processInfo]) {
+                [[Logger sharedLogger] info:@"[RuleManager] is matched a process rule"];
+                return YES; // 命中一条即匹配
+            }else{
+                [[Logger sharedLogger] info:@"[RuleManager] is not matched a process rule"];
+            }
         }
     }
     return NO;
@@ -526,12 +533,21 @@
 
 // 判断当前规则是否匹配给定的进程信息
 - (BOOL)matchesProcess:(ProcessRule *)processInfo {
-    if (!processInfo) return NO;
+    if (!processInfo){
+        [[Logger sharedLogger] error:@"[%@::%s] processInfo is nil" , NSStringFromClass([self class]), __FUNCTION__];
+        return NO;
+    }
+
 
     // 定义局部 block
     BOOL (^matchField)(NSString *, NSString *) = ^BOOL(NSString *ruleValue, NSString *actualValue) {
-        if (ruleValue.length == 0) return YES; // 规则为空 → 不限制
-        if (!actualValue) return NO;
+        if (ruleValue.length == 0) {
+            return YES; // 规则为空 → 不限制
+        }
+        if (!actualValue){
+            return NO;
+        }
+        [[Logger sharedLogger] info:@"--[%s] is executed--" , __FUNCTION__];
         return [ruleValue isEqualToString:actualValue];
     };
 

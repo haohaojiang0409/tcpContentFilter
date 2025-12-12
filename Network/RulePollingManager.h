@@ -7,7 +7,7 @@
 #pragma once
 
 #import <Foundation/Foundation.h>
-
+#import "log.h"
 @interface RulePollingManager : NSObject
 
 @property (nonatomic, strong) dispatch_source_t _Nullable timer;
@@ -21,6 +21,8 @@
 -(void)startPolling;
 
 -(void)stopPolling;
+
+- (void)fetchOnce;
 
 -(NSError *_Nullable)waitForInitialLoadWithTimeout:(NSTimeInterval)timeout;
 
