@@ -60,17 +60,13 @@
                 "tip": -1
             },
             "level": 4,
-            "direction": "out",
+            "direction": "in",
             "proto": "tcp|udp|icmp",
             "action": "pass",
             "report": 1,
             "policy_name": "jth_chr",
             "policy_id": "edr_fw_42dfc63c-7d3c-4d85-8d5b-296c8c1427b1",
             "processes": [{
-                "process_name": "com.eagley",
-                "hash256": "b115030c6abeaee8d7a8dd5008c8101d9ec",
-                "path": "/Library/PrivilegedHelperTr"
-            }, {
                 "process_name": "11111",
                 "company": "company",
                 "hash256": "1241241212",
@@ -79,13 +75,20 @@
                 "product_des": "12121111",
                 "path": "123123",
                 "signer": "23141"
+            }, {
+                "process_name": "com.eagley",
+                "hash256": "b115030c6abeaee8d7a8dd5008c8101d9ec",
+                "path": "/Library/PrivilegedHelperTr"
             }],
             "tuples": [{
-                "dst_port": ["1-65535"],
-                "dst_host": "www.baidu.com"
+                "source_ip": "2.2.0.0|255.255.252.0",
+                "dst_port": ["8000"]
+            }, {
+                "source_ip": "192.168.0.0|255.255.255.240",
+                "dst_port": ["80"]
             }]
         }]
     },
-    "data_version": "169974435",
+    "data_version": "1179273255",
     "data_not_changed": false
 }

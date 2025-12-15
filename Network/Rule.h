@@ -90,11 +90,9 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
 
 @property (nonatomic, strong) NSArray<fiveINetTuple *> * _Nonnull fiveTuples;
 
-#pragma mark - 进程信息
 //规则中包含的进程拦截
 @property (nonatomic , copy , nullable) NSArray<ProcessRule *> * processArr;
 
-#pragma mark - 动作
 /// 是否允许通过（YES = 放行，NO = 拦截）
 @property (nonatomic, assign) BOOL allow;
 
@@ -126,9 +124,9 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
                                processRules:(NSArray<ProcessRule*>* _Nullable) processRules;
 /// 快捷方法：是否涉及 DNS（目的端口 53 且协议 UDP/TCP）
 - (BOOL)isDNSRule;
-
-
 @end
+
+
 
 #pragma mark - 规则管理类，存储规则和方向-协议的对应关系
 @interface FirewallRuleManager : NSObject
@@ -141,6 +139,10 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
 
 //存储ip和域名的映射：一个ip可能对应多个域名
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSArray<NSString *> *> * _Nonnull ipToHostnamesMap;
+
+//存储规则集的哈希值
+@property (nonatomic, copy, readonly) NSString * _Nullable lastRulesetHash;
+
 
 + (instancetype _Nonnull )sharedManager;
 
@@ -173,6 +175,10 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
                                             process:(Process* _Nonnull)_process;
 
 - (BOOL)matchesProcess:(ProcessRule * _Nullable)processInfo  rules:(NSArray<FirewallRule *> *_Nullable)candidateRules;
+
+//检测是否有更新
+- (void)reloadRulesIfNeededWithJSON:(NSArray<NSDictionary *> *_Nullable)ruleDictionaries;
+
 
 @end
 

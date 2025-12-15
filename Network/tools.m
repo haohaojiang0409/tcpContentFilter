@@ -29,6 +29,15 @@ uint32_t ipv4StringToUInt32(NSString *ipStr) {
     return 0;
 }
 
+uint32_t maskStringToUInt32(NSString * maskStr){
+    if (!maskStr || ![maskStr isKindOfClass:[NSString class]]) return 0;
+    struct in_addr addr;
+    if (inet_aton([maskStr UTF8String], &addr) == 0) {
+        return 0; // invalid
+    }
+    return ntohl(addr.s_addr);
+}
+
 #pragma mark - 将sha256转为字符串
 NSString *SHA256DataToHexString(const uint8_t digest[CC_SHA256_DIGEST_LENGTH]) {
     NSMutableString *hex = [NSMutableString stringWithCapacity:64];

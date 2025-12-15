@@ -20,6 +20,7 @@
 
 @implementation Process
 
+#pragma mark - 获取进程信息
 - (instancetype)initWithFlowMetadata:(NSData *)metadata {
     if (self = [super init]) {
         // 1. 从 metadata 提取 audit token
@@ -31,14 +32,11 @@
         memcpy(&auditToken, metadata.bytes, 32);
         _coreData.pid = audit_token_to_pid(auditToken);
         
-        // 2. 获取基础信息（可能失败）
+        // 2. 获取基础信息
         proc_name(_coreData.pid, _coreData.name, sizeof(_coreData.name));
         
         int err = proc_pidpath(_coreData.pid, _coreData.processPath, sizeof(_coreData.processPath));
-        if (err > 0) {
-            // 成功：result 是字节数，pathBuffer 已 null-terminated
-            //[[Logger sharedLogger] info: @"[Process::initWithFlowMetadata] %@", [NSString stringWithUTF8String: _coreData.processPath]];
-        } else if (err == 0) {
+        if (err == 0) {
             [[Logger sharedLogger] error: @"proc_pidpath failed: buffer too small or invalid PID"];
             // 实际上 PROC_PIDPATHINFO_MAXSIZE 应该足够大，所以更可能是无效 PID
         } else if (err == -1) {
@@ -119,7 +117,6 @@
     
     // 基础信息
     [logger info:@"=== Process Info ==="];
-    [logger info:@"Bundle Identifier: %@", self.bundleIdentifier ?: @"(null)"];
     [logger info:@"Process ID (PID): %d", (int)self.coreData.pid];
     [logger info:@"Process Name: %s", self.coreData.name ?: "(null)"];
     
@@ -135,14 +132,6 @@
     } else {
         [logger warning:@"  - (No signature info)"];
     }
-    
-    // Info.plist 内容（简略）
-//    if (self.infoPlist && [self.infoPlist count] > 0) {
-//        [logger info:@"Info.plist Keys: %@", [self.infoPlist allKeys]];
-//    } else {
-//        [logger warning:@"Info.plist: (null or empty)"];
-//    }
-    
     [logger info:@"====================\n"];
 }
 

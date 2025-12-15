@@ -36,7 +36,7 @@
         // 应用过滤设置
         [self applyFilterSettingsWithCompletion:completionHandler];
 
-        // 启动定期轮询（注意：不要在 completionHandler 内部启动，避免阻塞）
+        // 启动定期轮询
         dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
             [self.rulePollingManager startPolling];
         });
@@ -67,6 +67,8 @@
                 
                 if ([rawRules isKindOfClass:[NSArray class]] && rawRules.count > 0) {
                     FirewallRuleManager *manager = [FirewallRuleManager sharedManager];
+                    //TODO:判断一下是否有增量规则或修改规则
+                    
                     [manager removeAllRules];
                     
                     NSUInteger total = 0;
@@ -77,6 +79,8 @@
                             total++;
                         }
                     }
+                    //记录manager的哈希值
+                    manager.
                     [[Logger sharedLogger] info:@"Loaded %lu firewall rule objects", (unsigned long)total];
                     success = YES;
                 } else {
@@ -162,7 +166,7 @@
     }
     
     // 标记所有流都要数据
-    return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:NO peekInboundBytes:0 filterOutbound:YES peekOutboundBytes:1024];
+    return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:YES peekInboundBytes:512 filterOutbound:YES peekOutboundBytes:1024];
 }
 
 #pragma mark -- 判断是否自己的流
@@ -233,13 +237,7 @@
     if(IPPROTO_TCP == socketFlow.socketProtocol){
         [[Logger sharedLogger] info:@"---- %@ isTCPFlow----" , flow.identifier];
         matchedRule = [manager firstMatchedRuleForOutBound:remoteHostName remotePort:port protocol:@"tcp" process:process];
-        if(matchedRule && matchedRule.allow == NO){
-            //有对应规则且规则中为阻塞，就把这个流过滤掉
-            [[Logger sharedLogger] info:@"firewallRule is matched : %@ " , remoteHostName];
-            return [NEFilterDataVerdict dropVerdict];
-        }
     } else if (IPPROTO_UDP == socketFlow.socketProtocol) {
-
         if ([self isDNSFlow:flow]) {
             [[Logger sharedLogger] info:@"[ID : %@ is DNS", flow.identifier];
         } else {
@@ -248,34 +246,13 @@
                                                   remotePort:port
                                                     protocol:@"udp"
                                                      process:process];
-            if (matchedRule && !matchedRule.allow) {
-                [[Logger sharedLogger] info:@"==== firewallRule is matched : %@ ====", remoteHostName];
-                return [NEFilterDataVerdict dropVerdict];
-            }
         }
     }
+    if (matchedRule && !matchedRule.allow) {
+        [[Logger sharedLogger] info:@"==== firewallRule is matched : %@ ====", remoteHostName];
+        return [NEFilterDataVerdict dropVerdict];
+    }
     return [NEFilterDataVerdict allowVerdict];
-}
-
-#pragma mark -- 判断是否是DNS流
-- (BOOL)isDNSFlow:(NEFilterFlow *)flow {
-    if (![flow isKindOfClass:[NEFilterSocketFlow class]]) {
-        return NO;
-    }
-    
-    NEFilterSocketFlow *socketFlow = (NEFilterSocketFlow *)flow;
-    NWEndpoint *remoteEndpoint = socketFlow.remoteEndpoint;
-    
-    // 检查是否是 host endpoint（排除 UNIX socket 等）
-    if (![remoteEndpoint isKindOfClass:[NWHostEndpoint class]]) {
-        return NO;
-    }
-    
-    NWHostEndpoint *hostEndpoint = (NWHostEndpoint *)remoteEndpoint;
-    NSString *port = hostEndpoint.port;
-    
-    // DNS 标准端口是 53（字符串 "53"）
-    return [port isEqualToString:@"53"];
 }
 
 #pragma mark -- 处理入站的流
@@ -306,12 +283,11 @@
     // 获取进程信息
     NSData *processData = flow.sourceProcessAuditToken;
     Process *process = [[Process alloc] initWithFlowMetadata:flow.sourceProcessAuditToken];
-    ProcessRule *_processRule = [ProcessRule ruleWithProcess:process];
     
     // 4. 判断协议
     if (IPPROTO_TCP == socketFlow.socketProtocol) {
         [[Logger sharedLogger] info:@"---socketFlow[%@] is a tcp flow---", flow.identifier];
-        rule = [manager firstMatchedRuleForInBound:remoteHostName localPort:port protocol:@"tcp" process:_processRule];
+        rule = [manager firstMatchedRuleForInBound:remoteHostName localPort:port protocol:@"tcp" process:process];
     } else if (IPPROTO_UDP == socketFlow.socketProtocol) {
         // 入站 UDP：可能是 DNS 响应
         if ([self isDNSResponseWithData:readBytes]) {
@@ -334,6 +310,7 @@
     }
     
     if (rule && !rule.allow) {
+        [[Logger sharedLogger] info:@"[handleInboundDataFromFlow] matched a rule"];
         return [NEFilterDataVerdict dropVerdict];
     }
     return [NEFilterDataVerdict allowVerdict];
@@ -354,6 +331,27 @@
     return isResponse;
 }
 
+#pragma mark -- 判断是否是DNS流
+- (BOOL)isDNSFlow:(NEFilterFlow *)flow {
+    if (![flow isKindOfClass:[NEFilterSocketFlow class]]) {
+        return NO;
+    }
+    
+    NEFilterSocketFlow *socketFlow = (NEFilterSocketFlow *)flow;
+    NWEndpoint *remoteEndpoint = socketFlow.remoteEndpoint;
+    
+    // 检查是否是 host endpoint（排除 UNIX socket 等）
+    if (![remoteEndpoint isKindOfClass:[NWHostEndpoint class]]) {
+        return NO;
+    }
+    
+    NWHostEndpoint *hostEndpoint = (NWHostEndpoint *)remoteEndpoint;
+    NSString *port = hostEndpoint.port;
+    
+    // DNS 标准端口是 53（字符串 "53"）
+    return [port isEqualToString:@"53"];
+}
+
 #pragma mark -- 解析 DNS Response，提取域名和IP映射
 - (void)parseDNSResponse:(NSData *)data forFlow:(NEFilterFlow *)flow {
     // 1. 跳过 DNS 头部
@@ -368,14 +366,14 @@
         return;
     }
     
-    // Step 1: 解析 Question -> 获取原始域名
+    // 3. 解析 Question -> 获取原始域名
     NSString *queryDomain = [self parseDomainFromDNSAtOffset:&bytes[12] data:data startOffset:12];
     if (!queryDomain || queryDomain.length == 0) {
         [[Logger sharedLogger] info:@"Failed to parse query domain in DNS response"];
         return;
     }
     
-    // Step 2: 跳过 Question Section（每个 Question = QNAME + QTYPE(2) + QCLASS(2)）
+    // 4. 跳过 Question Section（每个 Question = QNAME + QTYPE(2) + QCLASS(2)）
     NSUInteger offset = 12;
     NSString *dummy = [self parseDomainFromDNSAtOffset:&bytes[offset] data:data startOffset:offset];
     if (!dummy) return;
@@ -383,7 +381,7 @@
     if (questionEnd == NSNotFound) return;
     offset = questionEnd + 4; // +4 for QTYPE + QCLASS
     
-    // Step 3: 遍历 Answer Section
+    // 5. 遍历 Answer Section
     for (int i = 0; i < anCount && offset < data.length; i++) {
         NSUInteger nameStart = offset;
         NSString *name = [self parseDomainFromDNSAtOffset:&bytes[offset] data:data startOffset:offset];
@@ -417,11 +415,13 @@
             [[DomainIPCache sharedCache] addMappingForDomain:queryDomain ip:ip6];
         }
         
-        // 移动到下一个 RR
+        // 6.
         offset = nameEnd + 10 + rdlength;
     }
 }
 #pragma mark -- 解析DNS报文
+///域名在DNS报文中都是这样存储的
+///03 w w w 07 e x a m p l e 03 c o m，前面的数字表示长度，后面的是域名每个对应字母
 - (NSString *)parseDomainFromDNSAtOffset:(const uint8_t *)start data:(NSData *)data startOffset:(NSUInteger)startOffset {
     NSMutableString *domain = [NSMutableString string];
     const uint8_t *bytes = (const uint8_t *)[data bytes];
@@ -431,25 +431,25 @@
     
     while (offset < data.length && jumps < maxJumps) {
         uint8_t len = bytes[offset];
+        //遇到00读取域名结束
         if (len == 0) {
             break; // end of name
         }
-        
+        //判断是否是压缩指针，0xC0 和 一个数与是否等于 1100 0000
         if ((len & 0xC0) == 0xC0) {
-            // Compressed pointer
             if (offset + 1 >= data.length) return nil;
+            //计算真实偏移：长度和0x0011 1111与之后的结果左移8位
             uint16_t pointer = ((len & 0x3F) << 8) | bytes[offset + 1];
             if (pointer >= data.length) return nil;
+            //跳转到对应位置继续进行解析
             offset = pointer;
             jumps++;
             continue;
         }
-        
         if (offset + 1 + len > data.length) return nil;
-        
         NSString *label = [[NSString alloc] initWithBytes:&bytes[offset + 1]
                                                   length:len
-                                                encoding:NSASCIIStringEncoding]; // DNS labels are ASCII
+                                                encoding:NSASCIIStringEncoding];
         if (!label) return nil;
         
         if (domain.length > 0) [domain appendString:@"."];
@@ -461,7 +461,8 @@
     return domain.length > 0 ? [domain copy] : nil;
 }
 
-- (NSUInteger)getDomainLengthAtOffset:(NSUInteger)offset data:(NSData *)data {
+#pragma mark - 获取DNS域名长度
+- (NSUInteger)getDomainLengthAtOffset:(NSUInteger)offset data:(NSData *)data{
     const uint8_t *bytes = (const uint8_t *)[data bytes];
     NSUInteger originalOffset = offset;
     int jumps = 0;
@@ -470,10 +471,10 @@
     while (offset < data.length && jumps < maxJumps) {
         uint8_t len = bytes[offset];
         if (len == 0) {
-            return offset + 1; // include the zero byte
+            return offset + 1;
         }
         if ((len & 0xC0) == 0xC0) {
-            // Pointer: consumes 2 bytes at current position
+            // 压缩指针只占两字节
             return originalOffset + 2;
         }
         if (offset + 1 + len > data.length) {
@@ -503,8 +504,8 @@
     // 解析 JSON
     NSError *jsonError = nil;
     NSDictionary *jsonDict = [NSJSONSerialization JSONObjectWithData:jsonData
-                                                             options:0
-                                                               error:&jsonError];
+                                                  options:0
+                                                  error:&jsonError];
     if (jsonError || ![jsonDict isKindOfClass:[NSDictionary class]]) {
         [[Logger sharedLogger] error:@"%@", [NSString stringWithFormat:@"Failed to parse local rule.json: %@", jsonError.localizedDescription]];
         return;

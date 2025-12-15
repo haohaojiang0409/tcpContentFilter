@@ -22,21 +22,14 @@ typedef struct {
     pid_t pid;
     char name[64];
     uint8_t sha256[32];
-    BOOL hasSha256;
     char processPath[PROC_PIDPATHINFO_MAXSIZE];
 }ProcessCoreData;
 
 
 @interface Process : NSObject
 
-// 从原始流提取数据解析
+// 进程信息
 - (instancetype)initWithFlowMetadata:(NSData *)metadata;
-
-// 基础信息
-@property (nonatomic, readonly, nullable) NSString *bundleIdentifier; // CFBundleIdentifier
-
-// 派生信息（需文件访问，可能为 nil，受沙盒限制）
-@property (nonatomic, readonly, nullable) NSString *bundlePath;
 
 //apple数字签名
 @property (nonatomic, readonly, nullable) NSDictionary<NSString *, id> *infoPlist;

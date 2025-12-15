@@ -19,5 +19,7 @@ uint32_t strToIpv4Uint16(NSString* strHostName);
 
 uint32_t ipv4StringToUInt32(NSString *ipStr);
 
+uint32_t maskStringToUInt32(NSString * maskStr);
+
 NSString *SHA256DataToHexString(const uint8_t digest[CC_SHA256_DIGEST_LENGTH]);
 #endif

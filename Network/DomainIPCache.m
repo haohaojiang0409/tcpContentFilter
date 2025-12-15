@@ -23,6 +23,7 @@
 #pragma mark -- 记录域名-->ip ip-->域名的映射
 @implementation DomainIPCache
 
+
 + (instancetype)sharedCache {
     static DomainIPCache *instance = nil;
     static dispatch_once_t onceToken;
@@ -41,7 +42,7 @@
     return self;
 }
 
-//添加域名和ip的映射
+#pragma mark -- FUNC：添加域名和ip的映射
 - (void)addMappingForDomain:(NSString *)domain ip:(NSString *)ip {
     dispatch_async(self.cacheQueue, ^{
         // 正向：domain -> set of IPs
@@ -57,7 +58,7 @@
     });
 }
 
-//通过ip获取域名
+#pragma mark -- FUNC：通过ip获取域名
 - (nullable NSString *)domainForIP:(NSString *)ip {
     __block NSString *result = nil;
     dispatch_sync(self.cacheQueue, ^{
@@ -66,6 +67,7 @@
     return result;
 }
 
+#pragma mark -- FUNC：清除map中所有映射
 - (void)clear {
     dispatch_async(self.cacheQueue, ^{
         [self.domainToIPs removeAllObjects];

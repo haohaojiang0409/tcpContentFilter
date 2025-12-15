@@ -121,7 +121,7 @@
             }
         }
         
-        // ✅ 关键：通过回调通知结果，不再使用信号量！
+        // 通过回调通知结果
         dispatch_async(dispatch_get_main_queue(), ^{
             if (self.onJSONReceived) {
                 self.onJSONReceived(jsonDict);
@@ -131,5 +131,6 @@
     
     [task resume];
 }
+
 
 @end

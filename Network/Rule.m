@@ -72,12 +72,12 @@
     return self;
 }
 
+#pragma mark - 通过字典初始化规则
 + (NSArray<FirewallRule *> *)rulesWithDictionary:(NSDictionary *)dict {
-    [[Logger sharedLogger] info:@"[rulesWithDictionary] is started!"];
     // 1. 解析 direction
     NSString *dirStr = dict[@"direction"];
     if (![dirStr isEqualToString:@"out"] && ![dirStr isEqualToString:@"in"]) {
-        NSLog(@"[RULE PARSE] Invalid direction: %@", dirStr ?: @"(null)");
+        [[Logger sharedLogger] error:@"[RULE PARSE] Invalid direction: %@", dirStr ?:@"(null)"];
         return @[];
     }
     FlowDirection direction = [dirStr isEqualToString:@"out"] ? FlowDirectionOutbound : FlowDirectionInbound;
@@ -106,7 +106,7 @@
         }
     }
     if (protocolTypes.count == 0) {
-        NSLog(@"[RULE PARSE] ❌ No valid protocols in rule (proto: %@)", protoStr ?: @"(null)");
+        [[Logger sharedLogger] error:@"[RULE PARSE] No valid protocols in rule (proto: %@)", protoStr ?: @"(null)"];
         return @[];
     }
 
@@ -125,37 +125,70 @@
     if ([rawTuples isKindOfClass:[NSArray class]]) {
         for (NSDictionary *t in rawTuples) {
             NSString *host = t[@"dst_host"] ?: @"";
-            NSLog(@"hostName : %@",host);
+            [[Logger sharedLogger] info:@"hostName : %@",host];
             NSArray *ports = t[@"dst_port"];
             if (![ports isKindOfClass:[NSArray class]]) continue;
             uint32_t ipStart = 0, ipEnd = 0;
+            //ip地址
             uint32_t ip = 0;
+
             if(direction == FlowDirectionOutbound){
                 // 👇 解析 source_ip（单个 IP 字符串）
                 NSString *ipStr = t[@"dst_ip"]; // 假设 JSON 中是字符串，如 "192.168.1.1"
-                                    if ([ipStr isKindOfClass:[NSString class]] && ipStr.length > 0) {
+                if ([ipStr isKindOfClass:[NSString class]] && ipStr.length > 0) {
                     //将ipv4地址转为数字进行比较
                     ip = ipv4StringToUInt32(ipStr);
                     if (ip != 0 || [ipStr isEqualToString:@"0.0.0.0"]) {
                         // 特别处理 "0.0.0.0"：ipv4StringToUInt32("0.0.0.0") 返回 0，但它是合法的
                         ipStart = ipEnd = ip;
-                        NSLog(@"outBound rule --- ip address : %@:%u",ipStr,ip);
+                        [[Logger sharedLogger] info: @"outBound rule --- ip address : %@:%u",ipStr,ip];
                     } else {
-                        NSLog(@"[RULE PARSE] ⚠️ Invalid dst_ip: %@", ipStr);
+                        [[Logger sharedLogger] info: @"[RULE PARSE] Invalid dst_ip: %@", ipStr];
                         continue; // 可选：跳过整个 tuple，或当作 0.0.0.0-255.255.255.255？
                     }
                 }
-            }else if(direction == FlowDirectionInbound){
-                NSString* ipStr = t[@"source_ip"];
-                //将ipv4地址转为数字进行比较
-                ip = ipv4StringToUInt32(ipStr);
-                if (ip != 0 || [ipStr isEqualToString:@"0.0.0.0"]) {
-                    // 特别处理 "0.0.0.0"：ipv4StringToUInt32("0.0.0.0") 返回 0，但它是合法的
-                    ipStart = ipEnd = ip;
-                    NSLog(@"inBound rule --- ip address : %@",ipStr);
+            } else if (direction == FlowDirectionInbound) {
+                NSString *ipStr = t[@"source_ip"];
+                
+                if ([ipStr containsString:@"|"]) {
+                    // 处理 "IP|Mask" 格式
+                    NSArray<NSString *> *parts = [ipStr componentsSeparatedByString:@"|"];
+                    if (parts.count == 2) {
+                        NSString *ipPart = parts[0];
+                        NSString *maskPart = parts[1];
+                        
+                        uint32_t ipVal = ipv4StringToUInt32(ipPart);
+                        uint32_t netmask = maskStringToUInt32(maskPart);
+                        
+                        if (netmask == 0 && ![maskPart isEqualToString:@"0.0.0.0"]) {
+                            [[Logger sharedLogger] error:@"Invalid subnet mask in source_ip: %@", ipStr];
+                            continue;
+                        }
+                        
+                        // 计算网络地址和广播地址
+                        uint32_t network = ipVal & netmask;
+                        uint32_t broadcast = network | (~netmask);
+                        
+                        ipStart = network;
+                        ipEnd = broadcast;
+                        
+                        [[Logger sharedLogger] error:@"inBound rule --- IP range: %@ -> [%u, %u]", ipStr, (unsigned int)ipStart, (unsigned int)ipEnd];
+                    } else {
+                        [[Logger sharedLogger] error:@"Incorrect JSON format for source_ip (expected 'IP|Mask'): %@", ipStr];
+                        continue;
+                    }
                 } else {
-                    NSLog(@"[RULE PARSE] ⚠️ Invalid source_ip: %@", ipStr);
-                    continue; // 可选：跳过整个 tuple，或当作 0.0.0.0-255.255.255.255？
+                    // 单个 IP 地址
+                    uint32_t ipVal = ipv4StringToUInt32(ipStr);
+                    
+                    // ipv4StringToUInt32 返回 0 可能是失败，也可能是 "0.0.0.0"
+                    if (ipVal == 0 && ![ipStr isEqualToString:@"0.0.0.0"]) {
+                        [[Logger sharedLogger] info:@"Invalid source_ip (not a valid IPv4): %@", ipStr];
+                        continue;
+                    }
+                    
+                    ipStart = ipEnd = ipVal;
+                    NSLog(@"inBound rule --- Single IP: %@", ipStr);
                 }
             }
             for (NSString *portSpec in ports) {
@@ -234,7 +267,6 @@
 @end
 ///规则管理类
 @implementation FirewallRuleManager
-
 + (instancetype)sharedManager {
     static FirewallRuleManager *instance = nil;
     static dispatch_once_t onceToken;
@@ -252,10 +284,12 @@
         //初始化ip映射域名字典
         _ipToHostnamesMap = [[NSMutableDictionary alloc] init];
         _syncQueue = dispatch_queue_create("com.bordercontrol.rulemanager.sync", DISPATCH_QUEUE_SERIAL);
+        _lastRulesetHash = nil;
     }
     return self;
 }
 
+#pragma mark - 添加单条规则
 - (void)addRule:(FirewallRule *)rule {
     dispatch_sync(self.syncQueue, ^{
         for (NSNumber *protoNum in rule.protocolTypes) {
@@ -291,7 +325,7 @@
     });
 }
 
-//二分插入
+#pragma mark - 辅助方法：二分插入
 - (NSInteger)indexOfInsertionForRule:(FirewallRule *)newRule
                       inSortedArray:(NSArray<FirewallRule *> *)sortedArray {
     NSInteger low = 0;
@@ -310,7 +344,64 @@
     return low;
 }
 
+#pragma mark - 删除单个规则
+- (void)removeRule:(FirewallRule *)ruleToRemove {
+    dispatch_sync(self.syncQueue, ^{
+        // 获取待删除规则的唯一标识
+        NSString *targetId = ruleToRemove.policyId;
+        if (targetId.length == 0) {
+            NSLog(@"[Firewall] ⚠️ Cannot remove rule: no valid policyId or contentHash");
+            return;
+        }
+        
+        for (NSNumber *protoNum in ruleToRemove.protocolTypes) {
+            TransportProtocol proto = (TransportProtocol)[protoNum unsignedIntegerValue];
+            
+            NSString *dirStr = (ruleToRemove.direction == FlowDirectionOutbound) ? @"out" : @"in";
+            NSString *protoStr = nil;
+            switch (proto) {
+                case TransportProtocolTCP:
+                    protoStr = @"tcp";
+                    break;
+                case TransportProtocolUDP:
+                    protoStr = @"udp";
+                    break;
+                case TransportProtocolICMP:
+                    protoStr = @"icmp";
+                    break;
+                default:
+                    continue;
+            }
+            
+            NSString *key = [RuleCompositeKeyGenerator compositeKeyWithDirection:dirStr protocol:protoStr];
+            NSMutableArray<FirewallRule *> *group = self.ruleGroups[key];
+            if (!group || group.count == 0) {
+                continue;
+            }
+            
+            // 遍历查找匹配的规则（基于唯一 ID）
+            __block NSInteger foundIndex = NSNotFound;
+            for (NSInteger i = 0; i < group.count; i++) {
+                FirewallRule *existingRule = group[i];
+                NSString *existingId = existingRule.policyId;
+                
+                if ([targetId isEqualToString:existingId]) {
+                    foundIndex = i;
+                    break;
+                }
+            }
+            
+            if (foundIndex != NSNotFound) {
+                [group removeObjectAtIndex:foundIndex];
+                NSLog(@"[Firewall] Removed rule with ID: %@ from group: %@", targetId, key);
+            } else {
+                NSLog(@"[Firewall] Rule not found in group %@ for removal (ID: %@)", key, targetId);
+            }
+        }
+    });
+}
 
+#pragma mark - 删除所有规则
 - (void)removeAllRules {
     dispatch_sync(self.syncQueue, ^{
         [self.ruleGroups removeAllObjects];
@@ -330,7 +421,7 @@
     return result;
 }
 
-//返回所有规则列表
+#pragma mark - 返回所有规则列表
 - (NSArray<FirewallRule *> *)allRules {
     __block NSMutableSet<FirewallRule *> *uniqueRules = [NSMutableSet set];
     dispatch_sync(self.syncQueue, ^{
@@ -341,7 +432,7 @@
     return [uniqueRules allObjects];
 }
 
-///出站判断函数，出站可匹配ip地址，可匹配域名
+#pragma mark - 出站判断函数，出站可匹配ip地址，可匹配域名
 -(FirewallRule*)firstMatchedRuleForOutBound:(NSString*)_remoteHostName
                                  remotePort:(NSString*)_remotePort
                                    protocol:(NSString*)_Protocol
@@ -403,11 +494,11 @@
     return nil;
 }
 
-//入站匹配函数
+#pragma mark - 入站匹配函数
 -(FirewallRule*_Nonnull)firstMatchedRuleForInBound:(NSString*_Nonnull)_remoteIP
                                         localPort:(NSString*_Nonnull)_localPort
                                           protocol:(NSString*_Nonnull)_Protocol
-                                           process:(ProcessRule*)_processrule{
+                                           process:(Process*)_process{
     // 1. 获取该 direction + protocol 下的所有规则
     NSArray<FirewallRule *> *candidateRules = [self rulesForDirection:FlowDirectionInbound protocol:_Protocol];
     if (candidateRules.count == 0) {
@@ -440,7 +531,8 @@
                 uint32_t remoteIp = ipv4StringToUInt32(_remoteIP);
                 if((tuple.ipStart == 0 && tuple.ipEnd == 0) || (remoteIp >= tuple.ipStart && remoteIp <= tuple.ipEnd)){
                     //TODO : 匹配进程
-                    isMatched = [self matchesProcess:_processrule rules:candidateRules];
+                    ProcessRule * processRule = [ProcessRule ruleWithProcess:_process];
+                    isMatched = [self matchesProcess:processRule rules:candidateRules];
                     if(isMatched)
                         break;
                 }
@@ -449,6 +541,7 @@
             }
         }
         if(isMatched){
+            [[Logger sharedLogger] info:@"[RuleManager] has matched a rule"];
             return rule;
         }
     }
@@ -497,6 +590,169 @@
     return NO;
 }
 
+#pragma mark - 热更新判断
+- (void)reloadRulesIfNeededWithJSON:(NSArray<NSDictionary *> * _Nullable)ruleDictionaries {
+    if (!ruleDictionaries || ruleDictionaries.count == 0) {
+        [[Logger sharedLogger] info:@"[Firewall] Empty rules received, skipping."];
+        return;
+    }
+    //1.将JSON转为对象数组
+    NSMutableArray<FirewallRule *> *newRules = [NSMutableArray array];
+    for (NSDictionary *dict in ruleDictionaries) {
+        NSArray<FirewallRule *> *rules = [FirewallRule rulesWithDictionary:dict];
+        [newRules addObjectsFromArray:rules];
+    }
+
+    // 2. 按照复合键分组构建新json的规则集
+    NSMutableDictionary<NSString *,NSMutableArray<FirewallRule *> * > *newRuleGroups = [NSMutableDictionary dictionary];
+    for(FirewallRule* rule in newRules){
+        for(NSNumber *protoNum in rule.protocolTypes){
+            NSString* protoStr = [self protocolStringFromNumber:protoNum.integerValue];
+            if(!protoStr) continue;
+            NSString* dirStr = (rule.direction == FlowDirectionInbound) ? @"in" : @"out";
+            NSString* compositeKey = [NSString stringWithFormat:@"%@_%@", protoStr, dirStr];
+            NSMutableArray<FirewallRule *> *bucket = newRuleGroups[compositeKey];
+            if (!bucket) {
+                bucket = [NSMutableArray array];
+                newRuleGroups[compositeKey] = bucket;
+            }
+            [bucket addObject:rule];
+        }
+    }
+
+    NSArray<NSString *> *allKeys = @[@"in_tcp", @"out_tcp", @"in_udp", @"out_udp"];
+    for (NSString *key in allKeys) {
+        if (!newRuleGroups[key]) {
+            newRuleGroups[key] = [NSMutableArray array];
+        }
+    }
+    // 3. 计算新规则集哈希
+    NSString *newHash = [self hashForRuleGroups:newRuleGroups];
+    if ([newHash isEqualToString:_lastRulesetHash]) {
+        [[Logger sharedLogger] info:@"[Firewall] Rules unchanged (hash: %@), skip reload.", newHash];
+        return;
+    }
+    // 4. 哈希变了，执行增量更新
+    dispatch_async(_syncQueue, ^{
+        [self performIncrementalUpdateWithNewRuleGroups:newRuleGroups newHash:newHash allKeys:allKeys];
+    });
+}
+
+#pragma mark - 增量更新核心逻辑
+- (void)performIncrementalUpdateWithNewRuleGroups:
+(NSMutableDictionary<NSString *, NSMutableArray<FirewallRule *> *> *)newRuleGroups newHash:(NSString *)newHash allKeys:(NSArray<NSString*>*)allKeys{
+    
+    for (NSString *key in allKeys) {
+        NSMutableArray<FirewallRule *> *oldBucket = self.ruleGroups[key] ?: [NSMutableArray array];
+        NSMutableArray<FirewallRule *> *newBucket = newRuleGroups[key] ?: [NSMutableArray array];
+
+        // 构建 ID 映射（以 policyId 为唯一标识）
+        NSMutableDictionary<NSString *, FirewallRule *> *oldMap = [NSMutableDictionary dictionary];
+        for (FirewallRule *rule in oldBucket) {
+            NSString *id = rule.policyId;
+            oldMap[id] = rule;
+        }
+
+        NSMutableDictionary<NSString *, FirewallRule *> *newMap = [NSMutableDictionary dictionary];
+        for (FirewallRule *rule in newBucket) {
+            NSString *id = rule.policyId;
+            newMap[id] = rule;
+        }
+
+        // 找出差异
+        NSMutableSet<NSString *> *toRemove = [NSMutableSet set];
+        for (NSString *id in oldMap.allKeys) {
+            if (!newMap[id]) {
+                [toRemove addObject:id];
+            }
+        }
+
+        NSMutableSet<NSString *> *toAdd = [NSMutableSet set];
+        for (NSString *id in newMap.allKeys) {
+            if (!oldMap[id]) {
+                [toAdd addObject:id];
+            }
+        }
+
+        // 先删
+        for (NSString *id in toRemove) {
+            FirewallRule *rule = oldMap[id];
+            [self removeRule:rule];
+            [[Logger sharedLogger] info:@"[Firewall] Removed from %@: %@", key, rule.policyName ?: id];
+        }
+
+        // 再加
+        for (NSString *id in toAdd) {
+            FirewallRule *rule = newMap[id];
+            [self addRule:rule];
+        }
+
+        // 更新该桶
+        self.ruleGroups[key] = [newBucket mutableCopy];
+    }
+
+    _lastRulesetHash = newHash;
+    [[Logger sharedLogger] info:@"[Firewall] Incremental update done for all groups."];
+}
+
+#pragma mark - 辅助方法
+- (NSString *)protocolStringFromNumber:(int)proto {
+    switch (proto) {
+        case IPPROTO_TCP: return @"tcp";
+        case IPPROTO_UDP: return @"udp";
+        case IPPROTO_ICMP: return @"icmp"; // 如果未来支持
+        default: return nil;
+    }
+}
+
+#pragma mark - 规则集哈希计算
+- (NSString *)hashForRuleGroups:(NSDictionary<NSString *, NSArray<FirewallRule *> *> *)groups {
+    // 1. 按 composite key 排序（如 tcp_in, tcp_out...）
+    NSArray<NSString *> *sortedKeys = [[groups allKeys] sortedArrayUsingSelector:@selector(compare:)];
+    NSMutableString *key = [NSMutableString string];
+    
+    for (NSString *k in sortedKeys) {
+        NSArray<FirewallRule *> *rules = groups[k];
+        if (!rules || rules.count == 0) {
+            // 空桶也要参与哈希，避免结构变化被忽略
+            [key appendFormat:@"%@|EMPTY|", k];
+            continue;
+        }
+        
+        // 2. 桶内规则按 level 升序排序（level 越小优先级越高，且全局唯一）
+        NSArray<FirewallRule *> *sortedRules = [rules sortedArrayUsingComparator:^NSComparisonResult(FirewallRule *a, FirewallRule *b) {
+            if (a.level < b.level) return NSOrderedAscending;
+            if (a.level > b.level) return NSOrderedDescending;
+            // 因为 level 全局唯一，理论上不会相等，但加个断言更安全
+            NSAssert(NO, @"Duplicate level detected: %ld vs %ld", (long)a.level, (long)b.level);
+            return NSOrderedSame;
+        }];
+        
+        // 3. 拼接关键字段：composite key + 唯一ID + level + 动作
+        for (FirewallRule *rule in sortedRules) {
+            NSString *ruleId = rule.policyId;
+            [key appendFormat:@"%@|%@|%ld|%d|",
+                 k,
+                 ruleId,
+                 (long)rule.level,
+                 rule.allow ? 1 : 0
+            ];
+        }
+    }
+    
+    return [self sha256OfString:key];
+}
+
+- (NSString *)sha256OfString:(NSString *)input {
+    NSData *data = [input dataUsingEncoding:NSUTF8StringEncoding];
+    uint8_t digest[CC_SHA256_DIGEST_LENGTH];
+    CC_SHA256(data.bytes, (CC_LONG)data.length, digest);
+    NSMutableString *hash = [NSMutableString string];
+    for (int i = 0; i < CC_SHA256_DIGEST_LENGTH; i++) {
+        [hash appendFormat:@"%02x", digest[i]];
+    }
+    return [hash copy];
+}
 @end
 
 #pragma mark - 进程规则类

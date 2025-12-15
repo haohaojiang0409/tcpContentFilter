@@ -24,8 +24,6 @@
 
 - (void)fetchOnce;
 
--(NSError *_Nullable)waitForInitialLoadWithTimeout:(NSTimeInterval)timeout;
-
 /// 成功回调（在主线程调用）
 @property (nonatomic, copy, nullable) void (^onJSONReceived)(NSDictionary<NSString *, id> * _Nonnull json);
 
