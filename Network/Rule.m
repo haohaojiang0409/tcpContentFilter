@@ -591,10 +591,10 @@
 }
 
 #pragma mark - 热更新判断
-- (void)reloadRulesIfNeededWithJSON:(NSArray<NSDictionary *> * _Nullable)ruleDictionaries {
+- (BOOL)reloadRulesIfNeededWithJSON:(NSArray<NSDictionary *> * _Nullable)ruleDictionaries {
     if (!ruleDictionaries || ruleDictionaries.count == 0) {
         [[Logger sharedLogger] info:@"[Firewall] Empty rules received, skipping."];
-        return;
+        return NO;
     }
     //1.将JSON转为对象数组
     NSMutableArray<FirewallRule *> *newRules = [NSMutableArray array];
@@ -610,7 +610,7 @@
             NSString* protoStr = [self protocolStringFromNumber:protoNum.integerValue];
             if(!protoStr) continue;
             NSString* dirStr = (rule.direction == FlowDirectionInbound) ? @"in" : @"out";
-            NSString* compositeKey = [NSString stringWithFormat:@"%@_%@", protoStr, dirStr];
+            NSString* compositeKey = [NSString stringWithFormat:@"%@_%@",  dirStr ,protoStr];
             NSMutableArray<FirewallRule *> *bucket = newRuleGroups[compositeKey];
             if (!bucket) {
                 bucket = [NSMutableArray array];
@@ -630,12 +630,13 @@
     NSString *newHash = [self hashForRuleGroups:newRuleGroups];
     if ([newHash isEqualToString:_lastRulesetHash]) {
         [[Logger sharedLogger] info:@"[Firewall] Rules unchanged (hash: %@), skip reload.", newHash];
-        return;
+        return NO;
     }
     // 4. 哈希变了，执行增量更新
     dispatch_async(_syncQueue, ^{
         [self performIncrementalUpdateWithNewRuleGroups:newRuleGroups newHash:newHash allKeys:allKeys];
     });
+    return YES;
 }
 
 #pragma mark - 增量更新核心逻辑
@@ -707,7 +708,7 @@
 
 #pragma mark - 规则集哈希计算
 - (NSString *)hashForRuleGroups:(NSDictionary<NSString *, NSArray<FirewallRule *> *> *)groups {
-    // 1. 按 composite key 排序（如 tcp_in, tcp_out...）
+    // 1. 按 composite key 排序（如 in_tcp, out_tcp...)
     NSArray<NSString *> *sortedKeys = [[groups allKeys] sortedArrayUsingSelector:@selector(compare:)];
     NSMutableString *key = [NSMutableString string];
     

@@ -69,19 +69,22 @@
                     FirewallRuleManager *manager = [FirewallRuleManager sharedManager];
                     //TODO:判断一下是否有增量规则或修改规则
                     
-                    [manager removeAllRules];
-                    
-                    NSUInteger total = 0;
-                    for (NSDictionary *rawRule in rawRules) {
-                        NSArray<FirewallRule *> *rules = [FirewallRule rulesWithDictionary:rawRule];
-                        for (FirewallRule *rule in rules) {
-                            [manager addRule:rule];
-                            total++;
-                        }
+                    //- (void)reloadRulesIfNeededWithJSON:(NSArray<NSDictionary *> * _Nullable)ruleDictionaries
+                    if([manager reloadRulesIfNeededWithJSON:rawRules]){
+                        [[Logger sharedLogger] info:@"rulesGroup starts installing"];
+                    }else{
+                        [[Logger sharedLogger] info:@"rulesGroup stops installing"];
                     }
-                    //记录manager的哈希值
-                    manager.
-                    [[Logger sharedLogger] info:@"Loaded %lu firewall rule objects", (unsigned long)total];
+//                    NSUInteger total = 0;
+//                    for (NSDictionary *rawRule in rawRules) {
+//                        NSArray<FirewallRule *> *rules = [FirewallRule rulesWithDictionary:rawRule];
+//                        for (FirewallRule *rule in rules) {
+//                            [manager addRule:rule];
+//                            total++;
+//                        }
+//                    }
+//                    [[Logger sharedLogger] info:@"Loaded %lu firewall rule objects, hash is %@", (unsigned long)total , manager.lastRulesetHash];
+                    
                     success = YES;
                 } else {
                     loadError = [NSError errorWithDomain:@"RuleLoadError" code:-2
@@ -199,11 +202,9 @@
     //从URL获取主机名
     if(nil != socketFlow.URL.host){
         remoteHostName = socketFlow.URL.host;
-//        os_log(firewallLog ,"---- %{public}@ socket URL host:%{public}@ is not nil" , flow.identifier , remoteHostName);
     }//从flow中获取主机名
     else if(nil != socketFlow.remoteHostname){
         remoteHostName = socketFlow.remoteHostname;
-//        os_log(firewallLog ,"---- %{public}@ socket remoteHost Name:%{public}@ is not nil " , flow.identifier , remoteHostName);
     }//获取ip地址
     else if(nil != remoteEP.hostname){
         remoteHostName = remoteEP.hostname;

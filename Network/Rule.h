@@ -141,7 +141,7 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSArray<NSString *> *> * _Nonnull ipToHostnamesMap;
 
 //存储规则集的哈希值
-@property (nonatomic, copy, readonly) NSString * _Nullable lastRulesetHash;
+@property (nonatomic, copy , readonly) NSString * _Nullable lastRulesetHash;
 
 
 + (instancetype _Nonnull )sharedManager;
@@ -177,9 +177,10 @@ typedef NS_ENUM(NSUInteger, TransportProtocol) {
 - (BOOL)matchesProcess:(ProcessRule * _Nullable)processInfo  rules:(NSArray<FirewallRule *> *_Nullable)candidateRules;
 
 //检测是否有更新
-- (void)reloadRulesIfNeededWithJSON:(NSArray<NSDictionary *> *_Nullable)ruleDictionaries;
+- (BOOL)reloadRulesIfNeededWithJSON:(NSArray<NSDictionary *> *_Nullable)ruleDictionaries;
 
-
+//计算规则集哈希
+- (NSString * _Nullable)hashForRuleGroups:(NSDictionary<NSString *, NSArray<FirewallRule *> *> *_Nonnull)groups;
 @end
 
 

@@ -80,7 +80,24 @@
     
     // 设置 Cookie
     NSString *cookieString = @"__Host-brizoo-token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJodHRwczovL3NwLnByZS5lYWdsZXl1bi5jbi9zYW1sL21ldGFkYXRhIiwiZXhwIjoyMDc4MTE1MzMzLCJpYXQiOjE3NjI3NTUzMzMsIm5iZiI6MTc2Mjc1NTMzMywicHJpdmF0ZV9kYXRhIjoib2lsRVZOV2ZpYU1SRXE4SkU4dDNMaFI5dVBRNmxUVWR5OGQwejJjcTFMQ3ZDT0JLZ1RUVEtjQkN2RUlPZ1ZuaE1NVW11dHVhUjI0bnlSWmtPMnhIY3ZLZDc2V1FHV0k2Wi9XVXdiUm5DQ3BpRnRCREFjV1huSjd6WGx3NzZ5UjY2MDVINGNpY2t1WHpFSXRlekl2MzQyOFA0OUhwQnJMTFd5U1gvYXBaUkN3VjlvVDFXbTZ0ejd4Qmo0M1A0VkZmVEd2blV3UkNsT25uQnBVRmpPd1N3QkFCV1lTYjZOczczMzc4V1JzbDVNYk9hQWRIWEdROWZDVVFHdHRQRzBIdnY4TVh6ZmV4ZzluekF3cllIKzJ0UGV6SG9sWEtSU2t5UExSNm4xRVFQV3VaaVgwcnovRVZYd1QxblRKWnJyV2l5djFwaWk4ZkU4QlJvb00yeTRlRGwvU1dWM3NxMUlQVlVzY2xwa29aaHZNR2pTbGdVeU95OG5hSXZjWTJsRzdMU29kZ0dNeXc4QmcxYkk5VnRyWXJJYlNqQ2grLzBEQkRxaGo5clZSQ0hjeTdtN1pvallFZlRIYkhPSXpiYW1EN0x1enN2TU01WElZNWRGa2p5dmZlN2c9PSIsInB1YmxpY19kYXRhIjoie1wiaW5zX2lkXCI6XCJzcGFfNGY4MWQzNWEtMGExYy00NTYwLTgzODctNWY4NGJhMWU2NWU3XCJ9In0.iC2ZeUQBLQljvA4c4X1K-RMKnmZVhRUIdHkJ-yIymYFkRZ2XkzN3-rDqVtp_VXXzKvTp2qYz6oE1gzWGl4qtoDiUe5Vy2lQztl1QyTVExsVhgOd1pOl94g2qUr7bYEoMYEJV-FopvckeCkeJgVf7kDiSovYY1Tvdoc9DvayhuqXpfb2re734RC9CrXk-IE5xhi8PcW3LaL54jrK8ZGctfpU2U6rKyONx1ZuBnHvYLvgFj-5N2IDKUwuNBHp-gM7RuyQLM6xNVX8WV4NYHfImQB_N-Ltta2JOcaBvVePLYGJmevBGhiJWBChckfQAYbmrHpSZO9ZG1UmGwYBFggn8Zg";
-    [request setValue:cookieString forHTTPHeaderField:@"Cookie"];
+    //keyChain队列
+    NSDictionary* query = @{
+        (__bridge id)kSecClass:(__bridge id)kSecClassGenericPassword,
+        (__bridge id)kSecAttrService:@"com.eagleyun.BorderControl.Network",
+        (__bridge id)kSecAttrAccount:@"cookieString",
+        (__bridge id)kSecValueData:[cookieString dataUsingEncoding:NSUTF8StringEncoding]
+    };
+    
+    CFTypeRef result = NULL;
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
+    if (status == errSecSuccess && result) {
+        NSData *cookieData = (__bridge NSData *)result;
+        NSString *cookieString = [[NSString alloc] initWithData:cookieData encoding:NSUTF8StringEncoding];
+        [[Logger sharedLogger]  info:@"Read cookie: %@", cookieString];
+    } else {
+        [[Logger sharedLogger]  error:@"Cookie not found or error: %ld", (long)status];
+    }
+    [request setValue:(__bridge NSString * _Nullable)(result) forHTTPHeaderField:@"Cookie"];
     [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
     
     NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request
@@ -92,17 +109,17 @@
         __block NSError *loadError = nil;
         
         if (error) {
-            NSLog(@"[RulePolling] Network error: %@", error.localizedDescription);
+            [[Logger sharedLogger]  info:@"[RulePolling] Network error: %@", error.localizedDescription];
             loadError = error;
         } else if (!data || data.length == 0) {
-            NSLog(@"[RulePolling] Empty response");
+            [[Logger sharedLogger]  info:@"[RulePolling] Empty response"];
             loadError = [NSError errorWithDomain:@"RulePollingError"
                                             code:-2
                                         userInfo:@{NSLocalizedDescriptionKey:@"Empty response"}];
         } else {
             NSHTTPURLResponse *httpResp = (NSHTTPURLResponse *)response;
             if (httpResp.statusCode != 200) {
-                NSLog(@"[RulePolling] HTTP %ld", (long)httpResp.statusCode);
+                [[Logger sharedLogger]  info:@"[RulePolling] HTTP %ld", (long)httpResp.statusCode];
                 loadError = [NSError errorWithDomain:@"RulePollingError"
                                                 code:httpResp.statusCode
                                             userInfo:@{NSLocalizedDescriptionKey:[NSString stringWithFormat:@"HTTP %ld", (long)httpResp.statusCode]}];
@@ -110,13 +127,13 @@
                 NSError *jsonError = nil;
                 id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
                 if (jsonError || ![json isKindOfClass:[NSDictionary class]]) {
-                    NSLog(@"[RulePolling] Invalid JSON: %@", jsonError);
+                    [[Logger sharedLogger]  info:@"[RulePolling] Invalid JSON: %@", jsonError];
                     loadError = jsonError ?: [NSError errorWithDomain:@"RulePollingError"
                                                                  code:-3
                                                              userInfo:@{NSLocalizedDescriptionKey:@"Invalid JSON"}];
                 } else {
                     jsonDict = (NSDictionary *)json;
-                    NSLog(@"[RulePolling] JSON received successfully");
+                    [[Logger sharedLogger]  info:@"[RulePolling] JSON received successfully"];
                 }
             }
         }
