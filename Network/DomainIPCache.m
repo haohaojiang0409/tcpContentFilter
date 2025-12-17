@@ -20,9 +20,8 @@
 
 @end
 
-#pragma mark -- 记录域名-->ip ip-->域名的映射
+#pragma mark -- interface::记录域名-->ip ip-->域名的映射
 @implementation DomainIPCache
-
 
 + (instancetype)sharedCache {
     static DomainIPCache *instance = nil;

@@ -6,7 +6,7 @@
 //
 
 #import "RulePollingManager.h"
-// ✅ 类扩展：声明私有属性（包括 authToken）
+// 类扩展：声明私有属性（包括 authToken）
 @interface RulePollingManager ()
 
 @property (nonatomic, assign) BOOL hasCompletedInitialLoad; //标识是否是第一次加载规则
@@ -39,7 +39,7 @@
 - (void)startPolling {
     [self fetchJson];
     [[Logger sharedLogger] info:@"[%@] startPolling", NSStringFromClass([self class])];
-    // 创建 GCD Timer
+    // 创建 GCD Timer 和 全局后台队列
     dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0);
     self.timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
 
@@ -90,6 +90,7 @@
     
     CFTypeRef result = NULL;
     OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
+    //从keychain中取出cookie
     if (status == errSecSuccess && result) {
         NSData *cookieData = (__bridge NSData *)result;
         NSString *cookieString = [[NSString alloc] initWithData:cookieData encoding:NSUTF8StringEncoding];
@@ -101,9 +102,9 @@
     [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
     
     NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request
-                                                 completionHandler:^(NSData * _Nullable data,
-                                                                     NSURLResponse * _Nullable response,
-                                                                     NSError * _Nullable error) {
+                                 completionHandler:^(NSData * _Nullable data,
+                                    NSURLResponse * _Nullable response,
+                                    NSError * _Nullable error) {
         
         __block NSDictionary *jsonDict = nil;
         __block NSError *loadError = nil;
@@ -138,7 +139,7 @@
             }
         }
         
-        // 通过回调通知结果
+        // 通过回调通知主线程执行回调函数
         dispatch_async(dispatch_get_main_queue(), ^{
             if (self.onJSONReceived) {
                 self.onJSONReceived(jsonDict);

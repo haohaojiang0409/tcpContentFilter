@@ -17,4 +17,17 @@
 //日志文件最大字节数
 #define LOG_FILE_MAXSIZE (10 * 1024 * 1024) //10MB
 
+// 方向
+typedef NS_ENUM(NSUInteger, FlowDirection) {
+    FlowDirectionOutbound,
+    FlowDirectionInbound
+};
+
+// 协议
+typedef NS_ENUM(NSUInteger, TransportProtocol) {
+    TransportProtocolTCP,
+    TransportProtocolUDP,
+    TransportProtocolICMP,
+    TransportProtocolUnknown
+};
 

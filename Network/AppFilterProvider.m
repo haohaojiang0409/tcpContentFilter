@@ -104,8 +104,8 @@
     // 发起首次请求
     [self.rulePollingManager fetchOnce];
 
-    // 等待最多 10 秒
-    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_SEC));
+    // 等待最多 3 秒
+    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC));
     if (dispatch_semaphore_wait(semaphore, timeout) != 0) {
         // 超时
         loadError = [NSError errorWithDomain:@"RuleLoadError" code:-3
@@ -169,7 +169,7 @@
     }
     
     // 标记所有流都要数据
-    return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:YES peekInboundBytes:512 filterOutbound:YES peekOutboundBytes:1024];
+    return [NEFilterNewFlowVerdict filterDataVerdictWithFilterInbound:YES peekInboundBytes:1024 filterOutbound:YES peekOutboundBytes:1024];
 }
 
 #pragma mark -- 判断是否自己的流
@@ -208,9 +208,8 @@
     }//获取ip地址
     else if(nil != remoteEP.hostname){
         remoteHostName = remoteEP.hostname;
-        [[Logger sharedLogger] info:@"%@ remoteEP hostname:%@is not nil" , flow.identifier , remoteHostName];
     }
-    
+    [[Logger sharedLogger] info:@"%@ remoteEP hostname:%@is not nil" , flow.identifier , remoteHostName];
     
     FirewallRule* matchedRule = nil;
     port = remoteEP.port;
@@ -296,6 +295,7 @@
             
             // 异步解析 DNS，不阻塞当前线程
             NSData *dnsDataCopy = [readBytes copy];
+            //任务放入全局队列中，后台处理
             dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
                 @autoreleasepool {
                     [self parseDNSResponse:dnsDataCopy forFlow:flow];
@@ -367,7 +367,7 @@
         return;
     }
     
-    // 3. 解析 Question -> 获取原始域名
+    // 3. 解析 Question -> 从偏移12处，开始获取原始域名
     NSString *queryDomain = [self parseDomainFromDNSAtOffset:&bytes[12] data:data startOffset:12];
     if (!queryDomain || queryDomain.length == 0) {
         [[Logger sharedLogger] info:@"Failed to parse query domain in DNS response"];
@@ -462,7 +462,7 @@
     return domain.length > 0 ? [domain copy] : nil;
 }
 
-#pragma mark - 获取DNS域名长度
+#pragma mark - 获取DNS response报文长度
 - (NSUInteger)getDomainLengthAtOffset:(NSUInteger)offset data:(NSData *)data{
     const uint8_t *bytes = (const uint8_t *)[data bytes];
     NSUInteger originalOffset = offset;

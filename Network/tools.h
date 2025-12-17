@@ -12,6 +12,7 @@
 #import <arpa/inet.h>
 #include <CommonCrypto/CommonDigest.h>
 
+#import "const.h"
 //反向解析ip地址
 NSArray* resolveAddress(NSString* ipAddr);
 

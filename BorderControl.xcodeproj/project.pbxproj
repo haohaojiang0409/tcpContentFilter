@@ -14,6 +14,7 @@
 		44C04C892EE9546C00D3BD42 /* libbsm.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 44C04C882EE9544300D3BD42 /* libbsm.tbd */; };
 		44C04C8E2EEA62F400D3BD42 /* log.m in Sources */ = {isa = PBXBuildFile; fileRef = 44C04C8D2EEA62F400D3BD42 /* log.m */; };
 		44C04C902EEBB40B00D3BD42 /* rule.json in Resources */ = {isa = PBXBuildFile; fileRef = 44C04C8A2EE9772000D3BD42 /* rule.json */; };
+		44C04CBF2EF1751D00D3BD42 /* RuleManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 44C04CBE2EF1751D00D3BD42 /* RuleManager.m */; };
 		44F6A8172EE2BA6A0073BD27 /* DomainIPCache.m in Sources */ = {isa = PBXBuildFile; fileRef = 44F6A8162EE2BA680073BD27 /* DomainIPCache.m */; };
 		63938C572A38BCD600734619 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 63938C562A38BCD600734619 /* AppDelegate.m */; };
 		63938C5A2A38BCD600734619 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 63938C592A38BCD600734619 /* ViewController.m */; };
@@ -96,6 +97,8 @@
 		44C04C8C2EEA62F400D3BD42 /* log.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = log.h; sourceTree = "<group>"; };
 		44C04C8D2EEA62F400D3BD42 /* log.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = log.m; sourceTree = "<group>"; };
 		44C04C8F2EEA995B00D3BD42 /* const.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = const.h; sourceTree = "<group>"; };
+		44C04CBD2EF1750F00D3BD42 /* RuleManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RuleManager.h; sourceTree = "<group>"; };
+		44C04CBE2EF1751D00D3BD42 /* RuleManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RuleManager.m; sourceTree = "<group>"; };
 		44F6A8152EE2BA590073BD27 /* DomainIPCache.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DomainIPCache.h; sourceTree = "<group>"; };
 		44F6A8162EE2BA680073BD27 /* DomainIPCache.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DomainIPCache.m; sourceTree = "<group>"; };
 		6378C61A2A47B85100E1D2C4 /* libEndpointSecurity.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libEndpointSecurity.tbd; path = usr/lib/libEndpointSecurity.tbd; sourceTree = SDKROOT; };
@@ -194,6 +197,10 @@
 				44C04C8F2EEA995B00D3BD42 /* const.h */,
 				44C04C8C2EEA62F400D3BD42 /* log.h */,
 				44C04C8D2EEA62F400D3BD42 /* log.m */,
+				44766DDE2ED0099200814D30 /* Rule.h */,
+				44766DDF2ED0099800814D30 /* Rule.m */,
+				44C04CBD2EF1750F00D3BD42 /* RuleManager.h */,
+				44C04CBE2EF1751D00D3BD42 /* RuleManager.m */,
 				44C04C832EE81A4B00D3BD42 /* Process.h */,
 				44C04C842EE81A5200D3BD42 /* Process.m */,
 				446E1E612EE6A94700C8A7B9 /* RulePollingManager.h */,
@@ -204,8 +211,6 @@
 				44405ACE2ED97E9500FD2DD1 /* tools.m */,
 				63938C722A38BD2C00734619 /* AppFilterProvider.h */,
 				63938C732A38BD2C00734619 /* AppFilterProvider.m */,
-				44766DDE2ED0099200814D30 /* Rule.h */,
-				44766DDF2ED0099800814D30 /* Rule.m */,
 				63938C752A38BD2C00734619 /* main.m */,
 				63938C772A38BD2C00734619 /* Info.plist */,
 				63938C782A38BD2C00734619 /* Network.entitlements */,
@@ -336,6 +341,7 @@
 				44405ACF2ED97E9500FD2DD1 /* tools.m in Sources */,
 				44F6A8172EE2BA6A0073BD27 /* DomainIPCache.m in Sources */,
 				446E1E632EE6A95A00C8A7B9 /* RulePollingManager.m in Sources */,
+				44C04CBF2EF1751D00D3BD42 /* RuleManager.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

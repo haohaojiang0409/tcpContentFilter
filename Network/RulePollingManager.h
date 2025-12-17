@@ -8,6 +8,7 @@
 
 #import <Foundation/Foundation.h>
 #import "log.h"
+#import "const.h"
 @interface RulePollingManager : NSObject
 
 @property (nonatomic, strong) dispatch_source_t _Nullable timer;

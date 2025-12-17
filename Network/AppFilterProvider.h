@@ -12,8 +12,7 @@
 #import "DomainIPCache.h"
 #import "RulePollingManager.h"
 #import "Process.h"
-
-static os_log_t _Nonnull firewallLog;
+#import "RuleManager.h"
 
 @interface AppFilterProvider : NEFilterDataProvider
 
